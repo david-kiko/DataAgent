@@ -17,6 +17,7 @@
 package com.alibaba.cloud.ai.config;
 
 import com.alibaba.cloud.ai.connector.accessor.Accessor;
+import com.alibaba.cloud.ai.connector.accessor.AccessorFactory;
 import com.alibaba.cloud.ai.connector.config.DbConfig;
 import com.alibaba.cloud.ai.service.LlmService;
 import com.alibaba.cloud.ai.service.base.BaseNl2SqlService;
@@ -24,7 +25,7 @@ import com.alibaba.cloud.ai.service.base.BaseSchemaService;
 import com.alibaba.cloud.ai.service.base.BaseVectorStoreService;
 import com.alibaba.cloud.ai.service.simple.SimpleNl2SqlService;
 import com.alibaba.cloud.ai.service.simple.SimpleSchemaService;
-import com.google.gson.Gson;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -41,21 +42,15 @@ public class BaseDefaultConfiguration {
 
 	private static final Logger logger = LoggerFactory.getLogger(BaseDefaultConfiguration.class);
 
+	private final AccessorFactory accessorFactory;
+
 	private final Accessor dbAccessor;
 
 	private final DbConfig dbConfig;
 
-	private BaseDefaultConfiguration(DbConfig dbConfig, @Qualifier("mysqlAccessor") Accessor mysqlDbAccessor,
-			@Qualifier("h2Accessor") Accessor h2DbAccessor, @Qualifier("postgreAccessor") Accessor postgreDbAccessor) {
-		if ("h2".equals(dbConfig.getDialectType())) {
-			dbAccessor = h2DbAccessor;
-		}
-		else if ("postgre".equals(dbConfig.getDialectType())) {
-			dbAccessor = postgreDbAccessor;
-		}
-		else {
-			dbAccessor = mysqlDbAccessor;
-		}
+	private BaseDefaultConfiguration(DbConfig dbConfig, AccessorFactory accessorFactory) {
+		this.accessorFactory = accessorFactory;
+		this.dbAccessor = accessorFactory.getAccessorByDbConfig(dbConfig);
 		this.dbConfig = dbConfig;
 	}
 
@@ -66,23 +61,17 @@ public class BaseDefaultConfiguration {
 			@Qualifier("simpleSchemaService") BaseSchemaService schemaService, LlmService aiService) {
 
 		logger.info("Creating default BaseNl2SqlService implementation");
-		return new SimpleNl2SqlService(vectorStoreService, schemaService, aiService, dbAccessor, dbConfig);
+		return new SimpleNl2SqlService(vectorStoreService, schemaService, aiService, accessorFactory, dbConfig);
 	}
 
 	@Bean("schemaServiceImpl")
 	@ConditionalOnMissingBean(name = "schemaServiceImpl")
 	public BaseSchemaService defaultSchemaService(
 			@Qualifier("simpleVectorStoreService") BaseVectorStoreService vectorStoreService, DbConfig dbConfig,
-			Gson gson) {
+			ObjectMapper objectMapper) {
 
 		logger.info("Creating default BaseSchemaService implementation");
-		return new SimpleSchemaService(dbConfig, gson, vectorStoreService);
-	}
-
-	@Bean("dbAccessor")
-	@ConditionalOnMissingBean(name = "dbAccessor")
-	public Accessor dbAccessor() {
-		return dbAccessor;
+		return new SimpleSchemaService(dbConfig, objectMapper, vectorStoreService);
 	}
 
 }

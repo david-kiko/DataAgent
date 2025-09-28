@@ -16,6 +16,7 @@
 package com.alibaba.cloud.ai.service.simple;
 
 import com.alibaba.cloud.ai.connector.accessor.Accessor;
+import com.alibaba.cloud.ai.connector.accessor.AccessorFactory;
 import com.alibaba.cloud.ai.connector.bo.ColumnInfoBO;
 import com.alibaba.cloud.ai.connector.bo.DbQueryParameter;
 import com.alibaba.cloud.ai.connector.bo.ForeignKeyInfoBO;
@@ -25,7 +26,8 @@ import com.alibaba.cloud.ai.request.DeleteRequest;
 import com.alibaba.cloud.ai.request.SchemaInitRequest;
 import com.alibaba.cloud.ai.request.SearchRequest;
 import com.alibaba.cloud.ai.service.base.BaseVectorStoreService;
-import com.google.gson.Gson;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,7 +37,6 @@ import org.springframework.ai.vectorstore.SimpleVectorStore;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
@@ -60,7 +61,7 @@ public class SimpleVectorStoreService extends BaseVectorStoreService {
 	private final AgentVectorStoreManager agentVectorStoreManager; // New agent vector
 																	// storage manager
 
-	private final Gson gson;
+	private final ObjectMapper objectMapper;
 
 	private final Accessor dbAccessor;
 
@@ -69,13 +70,12 @@ public class SimpleVectorStoreService extends BaseVectorStoreService {
 	private final EmbeddingModel embeddingModel;
 
 	@Autowired
-	public SimpleVectorStoreService(EmbeddingModel embeddingModel, Gson gson,
-			@Qualifier("dbAccessor") Accessor dbAccessor, DbConfig dbConfig,
-			AgentVectorStoreManager agentVectorStoreManager) {
+	public SimpleVectorStoreService(EmbeddingModel embeddingModel, ObjectMapper objectMapper,
+			AccessorFactory accessorFactory, DbConfig dbConfig, AgentVectorStoreManager agentVectorStoreManager) {
 		log.info("Initializing SimpleVectorStoreService with EmbeddingModel: {}",
 				embeddingModel.getClass().getSimpleName());
-		this.gson = gson;
-		this.dbAccessor = dbAccessor;
+		this.objectMapper = objectMapper;
+		this.dbAccessor = accessorFactory.getAccessorByDbConfig(dbConfig);
 		this.dbConfig = dbConfig;
 		this.embeddingModel = embeddingModel;
 		this.agentVectorStoreManager = agentVectorStoreManager;
@@ -172,7 +172,12 @@ public class SimpleVectorStoreService extends BaseVectorStoreService {
 				.toList();
 
 			columnInfoBO.setTableName(tableInfoBO.getName());
-			columnInfoBO.setSamples(gson.toJson(sampleColumn));
+			try {
+				columnInfoBO.setSamples(objectMapper.writeValueAsString(sampleColumn));
+			}
+			catch (JsonProcessingException e) {
+				columnInfoBO.setSamples("[]");
+			}
 		}
 
 		List<ColumnInfoBO> targetPrimaryList = columnInfoBOS.stream()

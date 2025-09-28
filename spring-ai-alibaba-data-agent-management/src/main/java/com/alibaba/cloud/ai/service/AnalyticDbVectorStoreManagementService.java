@@ -17,6 +17,7 @@ package com.alibaba.cloud.ai.service;
 
 import com.alibaba.cloud.ai.annotation.ConditionalOnADBEnabled;
 import com.alibaba.cloud.ai.connector.accessor.Accessor;
+import com.alibaba.cloud.ai.connector.accessor.AccessorFactory;
 import com.alibaba.cloud.ai.connector.bo.ColumnInfoBO;
 import com.alibaba.cloud.ai.connector.bo.DbQueryParameter;
 import com.alibaba.cloud.ai.connector.bo.ForeignKeyInfoBO;
@@ -26,6 +27,7 @@ import com.alibaba.cloud.ai.request.DeleteRequest;
 import com.alibaba.cloud.ai.request.EvidenceRequest;
 import com.alibaba.cloud.ai.request.SchemaInitRequest;
 import com.alibaba.cloud.ai.request.SearchRequest;
+import com.alibaba.cloud.ai.util.JsonUtil;
 import com.alibaba.cloud.ai.vectorstore.analyticdb.AnalyticDbVectorStoreProperties;
 import com.aliyun.gpdb20160503.Client;
 import com.aliyun.gpdb20160503.models.DeleteCollectionDataRequest;
@@ -35,7 +37,7 @@ import com.aliyun.gpdb20160503.models.QueryCollectionDataResponse;
 import com.aliyun.gpdb20160503.models.QueryCollectionDataResponseBody;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.Gson;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.commons.collections.CollectionUtils;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingModel;
@@ -73,9 +75,7 @@ public class AnalyticDbVectorStoreManagementService implements VectorStoreManage
 	@Autowired
 	private VectorStore vectorStore;
 
-	@Autowired
-	@Qualifier("dbAccessor")
-	private Accessor dbAccessor;
+	private final Accessor dbAccessor;
 
 	@Autowired
 	private AnalyticDbVectorStoreProperties analyticDbVectorStoreProperties;
@@ -83,8 +83,11 @@ public class AnalyticDbVectorStoreManagementService implements VectorStoreManage
 	@Autowired
 	private Client client;
 
-	@Autowired
-	private Gson gson;
+	private final ObjectMapper objectMapper = JsonUtil.getObjectMapper();
+
+	public AnalyticDbVectorStoreManagementService(AccessorFactory accessorFactory, DbConfig dbConfig) {
+		this.dbAccessor = accessorFactory.getAccessorByDbConfig(dbConfig);
+	}
 
 	/**
 	 * Add evidence content to vector store
@@ -151,9 +154,9 @@ public class AnalyticDbVectorStoreManagementService implements VectorStoreManage
 					if (match.getScore() != null && match.getScore() > 0.2) {
 						Map<String, String> metadata = match.getMetadata();
 						String pageContent = metadata.get(CONTENT_FIELD_NAME);
-						Map<String, Object> metadataJson = new ObjectMapper()
-							.readValue(metadata.get(METADATA_FIELD_NAME), new TypeReference<HashMap<String, Object>>() {
-							});
+						Map<String, Object> metadataJson = objectMapper.readValue(metadata.get(METADATA_FIELD_NAME),
+								new TypeReference<HashMap<String, Object>>() {
+								});
 
 						Document doc = new Document(match.getId(), pageContent, metadataJson);
 						documents.add(doc);
@@ -269,7 +272,12 @@ public class AnalyticDbVectorStoreManagementService implements VectorStoreManage
 				.toList();
 
 			columnInfoBO.setTableName(tableInfoBO.getName());
-			columnInfoBO.setSamples(gson.toJson(sampleColumn));
+			try {
+				columnInfoBO.setSamples(objectMapper.writeValueAsString(sampleColumn));
+			}
+			catch (JsonProcessingException e) {
+				columnInfoBO.setSamples("[]");
+			}
 		}
 
 		List<ColumnInfoBO> targetPrimaryList = columnInfoBOS.stream()
