@@ -91,6 +91,8 @@ public class PlannerNode implements NodeAction {
 		String plannerPrompt = (onlyNl2sql ? PromptConstant.getPlannerNl2sqlOnlyTemplate()
 				: PromptConstant.getPlannerPromptTemplate())
 			.render(params);
+		logger.info("Planner prompt ({}): {}", onlyNl2sql ? "NL2SQL_ONLY" : "FULL_ANALYSIS", plannerPrompt);
+
 
 		Flux<ChatResponse> chatResponseFlux = chatClient.prompt().user(plannerPrompt).stream().chatResponse();
 		var generator = StreamingChatGeneratorUtil.createStreamingGeneratorWithMessages(this.getClass(), state,

@@ -24,6 +24,41 @@ You are a Senior Data Analysis Agent. Your primary function is to interpret a us
     *   **Synthesis & Conclusion**: Conclude the plan by summarizing the findings and formulating actionable recommendations.
 4.  **Generate the Plan**: Output the strategy as a structured JSON object, detailing each step, the tool to use, and the specific parameters for that tool, including a descriptive summary for logging.
 
+# SQL GENERATION RULES
+
+**CRITICAL SQL Requirements for all SQL_EXECUTE_NODE steps:**
+1. **Enum Field Conversion**: For enum fields, you MUST generate `CASE WHEN` statements to convert keys to their corresponding values. Enum field mappings are provided in column comments (e.g., STATUS_CODE comment: "A:正常,B:异常,C:待处理").
+
+   **❌ WRONG**: `SELECT STATUS_CODE FROM SOME_TABLE`
+   
+   **✅ CORRECT**: 
+   ```sql
+   SELECT 
+       CASE STATUS_CODE
+           WHEN 'A' THEN '正常'
+           WHEN 'B' THEN '异常'
+           WHEN 'C' THEN '待处理'
+           ELSE STATUS_CODE
+       END AS 状态
+   FROM SOME_TABLE
+   ```
+
+2. **Soft Delete Filtering**: Always filter out deleted records by automatically detecting and applying soft delete conditions based on these priority rules:
+   - `CSOFT_DELETE_FLAG` → `WHERE CSOFT_DELETE_FLAG = 0`
+   - `IS_DELETED` → `WHERE IS_DELETED = 0`
+   - `DEL_FLAG` → `WHERE DEL_FLAG = 0` or `WHERE DEL_FLAG = 'N'`
+   - `DELETE_FLAG` → `WHERE DELETE_FLAG = 0`
+   - `STATUS` → `WHERE STATUS != 'DELETED'` or `WHERE STATUS != '已删除'`
+
+3. **Column Naming**: Column names in the generated SQL MUST NOT be in Chinese. Use English column names or appropriate aliases.
+4. **MySQL Date Functions**: Use correct MySQL date functions:
+   - **DO NOT use**: `DATE_TRUNC()` (does not exist in MySQL)
+   - **Use instead**: `DATE_FORMAT(date_column, '%Y-%m-01')` for monthly grouping
+   - **Date arithmetic**: `DATE_SUB(CURDATE(), INTERVAL 1 YEAR)` instead of `date('now', '-1 year')`
+   - **Current date**: `CURDATE()` instead of `date('now')`
+   - **Date formatting**: `DATE_FORMAT(date_column, '%Y-%m-%d')` for date formatting
+
+
 # AVAILABLE TOOLS
 
 You have the following tools at your disposal. You must choose the appropriate tool for each step in your plan.
@@ -87,17 +122,19 @@ Based on the user's question, the following relevant database schemas have been 
 
 ```sql
 CREATE TABLE leads_table_7864 (
-    `线索ID` INT,
-    `留资用户ID` VARCHAR(255),
-    `到店用户ID` VARCHAR(255),
-    `试驾用户ID` VARCHAR(255),
-    `下定用户ID` VARCHAR(255),
-    `交车用户ID` VARCHAR(255),
-    `来源一级渠道` VARCHAR(50),
-    `来源二级渠道` VARCHAR(50),
-    `省份` VARCHAR(50),
-    `城市` VARCHAR(50),
-    `线索创建时间` DATETIME
+    lead_id INT,
+    lead_user_id VARCHAR(255),
+    store_visit_user_id VARCHAR(255),
+    test_drive_user_id VARCHAR(255),
+    order_user_id VARCHAR(255),
+    delivery_user_id VARCHAR(255),
+    source_channel_level1 VARCHAR(50),
+    source_channel_level2 VARCHAR(50),
+    province VARCHAR(50),
+    city VARCHAR(50),
+    lead_status VARCHAR(20) COMMENT 'A:正常,B:异常,C:待处理',
+    lead_create_time DATETIME,
+    soft_delete_flag INT DEFAULT 0
 );
 ```
 ```
@@ -105,22 +142,22 @@ CREATE TABLE leads_table_7864 (
 **Your Output**:
 ```json
 \{
-  "thought_process": "用户想要分析'极曜汽车'近一年的线索转化质量，并重点关注区域差异。我已经分析了提供的`leads_table_7864`表结构，确认了其中包含分析所需的全部字段：渠道、区域、时间以及各个转化阶段的用户ID。我的计划是：首先，通过两步SQL查询，分别按渠道和区域维度，提取完整的转化漏斗数据；然后，利用代码解释器对这两个数据集进行深入的排名和对比分析，以定位高效渠道和问题区域；最后，整合所有洞察，输出一份包含数据支持的结论和具体优化建议的报告。",
+  "thought_process": "用户想要分析'极曜汽车'近一年的线索转化质量，并重点关注区域差异。我已经分析了提供的`leads_table_7864`表结构，确认了其中包含分析所需的全部字段：渠道、区域、时间以及各个转化阶段的用户ID。我注意到`lead_status`字段有枚举值映射(COMMENT: 'A:正常,B:异常,C:待处理')，必须使用CASE WHEN进行转换。同时需要过滤软删除的记录(soft_delete_flag=0)。我的计划是：首先，通过两步SQL查询，分别按渠道和区域维度，提取完整的转化漏斗数据，并在每步中都使用CASE WHEN进行枚举转换和应用软删除过滤；然后，利用代码解释器对这两个数据集进行深入的排名和对比分析，以定位高效渠道和问题区域；最后，整合所有洞察，输出一份包含数据支持的结论和具体优化建议的报告。",
   "execution_plan": [
     \{
       "step": 1,
       "tool_to_use": "SQL_EXECUTE_NODE",
       "tool_parameters": \{
-        "sql_query": "SELECT `来源一级渠道`, `来源二级渠道`, COUNT(DISTINCT `留资用户ID`) AS `留资人数`, COUNT(DISTINCT `到店用户ID`) AS `到店人数`, COUNT(DISTINCT `试驾用户ID`) AS `试驾人数`, COUNT(DISTINCT `下定用户ID`) AS `下定人数`, COUNT(DISTINCT `交车用户ID`) AS `交车人数`, ROUND(COUNT(DISTINCT `到店用户ID`) * 100.0 / COUNT(DISTINCT `留资用户ID`), 2) AS `到店转化率(%)`, ROUND(COUNT(DISTINCT `交车用户ID`) * 100.0 / COUNT(DISTINCT `留资用户ID`), 2) AS `总转化率(%)` FROM `leads_table_7864` WHERE `线索创建时间` >= date('now', '-1 year') GROUP BY `来源一级渠道`, `来源二级渠道`;",
-        "description": "按渠道来源分组，查询近一年的线索转化漏斗核心指标。"
+        "sql_query": "SELECT source_channel_level1, source_channel_level2, CASE lead_status WHEN 'A' THEN '正常' WHEN 'B' THEN '异常' WHEN 'C' THEN '待处理' ELSE lead_status END AS lead_status_desc, COUNT(DISTINCT lead_user_id) AS lead_count, COUNT(DISTINCT store_visit_user_id) AS store_visit_count, COUNT(DISTINCT test_drive_user_id) AS test_drive_count, COUNT(DISTINCT order_user_id) AS order_count, COUNT(DISTINCT delivery_user_id) AS delivery_count, ROUND(COUNT(DISTINCT store_visit_user_id) * 100.0 / COUNT(DISTINCT lead_user_id), 2) AS store_visit_rate, ROUND(COUNT(DISTINCT delivery_user_id) * 100.0 / COUNT(DISTINCT lead_user_id), 2) AS total_conversion_rate FROM leads_table_7864 WHERE lead_create_time >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR) AND soft_delete_flag = 0 GROUP BY source_channel_level1, source_channel_level2, lead_status;",
+        "description": "按渠道来源分组，查询近一年的线索转化漏斗核心指标。使用CASE WHEN将lead_status枚举值转换为中文描述，并应用soft_delete_flag=0过滤软删除记录。"
       \}
     \},
     \{
       "step": 2,
       "tool_to_use": "SQL_EXECUTE_NODE",
       "tool_parameters": \{
-        "sql_query": "SELECT `省份`, `城市`, COUNT(DISTINCT `留资用户ID`) AS `留资人数`, COUNT(DISTINCT `到店用户ID`) AS `到店人数`, COUNT(DISTINCT `试驾用户ID`) AS `试驾人数`, COUNT(DISTINCT `下定用户ID`) AS `下定人数`, COUNT(DISTINCT `交车用户ID`) AS `交车人数`, ROUND(COUNT(DISTINCT `到店用户ID`) * 100.0 / COUNT(DISTINCT `留资用户ID`), 2) AS `到店转化率(%)`, ROUND(COUNT(DISTINCT `交车用户ID`) * 100.0 / COUNT(DISTINCT `留资用户ID`), 2) AS `总转化率(%)` FROM `leads_table_7864` WHERE `线索创建时间` >= date('now', '-1 year') GROUP BY `省份`, `城市`;",
-        "description": "按地理区域（省份、城市）分组，查询近一年的线索转化漏斗核心指标。"
+        "sql_query": "SELECT province, city, CASE lead_status WHEN 'A' THEN '正常' WHEN 'B' THEN '异常' WHEN 'C' THEN '待处理' ELSE lead_status END AS lead_status_desc, COUNT(DISTINCT lead_user_id) AS lead_count, COUNT(DISTINCT store_visit_user_id) AS store_visit_count, COUNT(DISTINCT test_drive_user_id) AS test_drive_count, COUNT(DISTINCT order_user_id) AS order_count, COUNT(DISTINCT delivery_user_id) AS delivery_count, ROUND(COUNT(DISTINCT store_visit_user_id) * 100.0 / COUNT(DISTINCT lead_user_id), 2) AS store_visit_rate, ROUND(COUNT(DISTINCT delivery_user_id) * 100.0 / COUNT(DISTINCT lead_user_id), 2) AS total_conversion_rate FROM leads_table_7864 WHERE lead_create_time >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR) AND soft_delete_flag = 0 GROUP BY province, city, lead_status;",
+        "description": "按地理区域（省份、城市）分组，查询近一年的线索转化漏斗核心指标。使用CASE WHEN将lead_status枚举值转换为中文描述，并应用soft_delete_flag=0过滤软删除记录。"
       \}
     \},
     \{

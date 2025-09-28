@@ -35,6 +35,7 @@ import java.util.Map;
 import static com.alibaba.cloud.ai.constant.Constant.PLAN_CURRENT_STEP;
 import static com.alibaba.cloud.ai.constant.Constant.PYTHON_ANALYSIS_NODE_OUTPUT;
 import static com.alibaba.cloud.ai.constant.Constant.PYTHON_EXECUTE_NODE_OUTPUT;
+import static com.alibaba.cloud.ai.constant.Constant.PYTHON_IS_SUCCESS;
 import static com.alibaba.cloud.ai.constant.Constant.QUERY_REWRITE_NODE_OUTPUT;
 import static com.alibaba.cloud.ai.constant.Constant.SQL_EXECUTE_NODE_OUTPUT;
 
@@ -66,6 +67,17 @@ public class PythonAnalyzeNode extends AbstractPlanBasedNode implements NodeActi
 		@SuppressWarnings("unchecked")
 		Map<String, String> sqlExecuteResult = StateUtils.getObjectValue(state, SQL_EXECUTE_NODE_OUTPUT, Map.class,
 				new HashMap());
+			
+		// Check if Python execution was successful
+		Boolean pythonSuccess = StateUtils.getObjectValue(state, PYTHON_IS_SUCCESS, Boolean.class, false);
+		
+		// If Python execution failed, don't add error information to execution results
+		if (!pythonSuccess) {
+			log.warn("Python execution failed, skipping analysis to avoid polluting execution results with error information");
+			// Return empty result without adding error information to SQL_EXECUTE_NODE_OUTPUT
+			return Map.of(PYTHON_ANALYSIS_NODE_OUTPUT, "Python执行失败，跳过分析", PLAN_CURRENT_STEP, currentStep + 1);
+		}
+
 
 		// Load Python code generation template
 		String systemPrompt = PromptConstant.getPythonAnalyzePromptTemplate()

@@ -3,6 +3,17 @@
 1、不要select多余的列。
 2、生成的SQL用```sql 和```包围起来。
 3、不要在SQL语句中加入注释！！！
+4、MySQL日期函数使用规范：
+   - 不要使用DATE_TRUNC函数（MySQL中不存在）
+   - 使用DATE_FORMAT函数进行日期格式化：
+     * 按月分组：DATE_FORMAT(date_column, '%Y-%m-01')
+     * 按年分组：DATE_FORMAT(date_column, '%Y-01-01')
+     * 按日分组：DATE_FORMAT(date_column, '%Y-%m-%d')
+   - 其他常用MySQL日期函数：
+     * 获取当前日期：CURDATE()
+     * 获取当前时间：NOW()
+     * 日期加减：DATE_ADD(date_column, INTERVAL 1 MONTH)
+     * 日期差：DATEDIFF(date1, date2)
 
 【数据库schema】
 {schema_info}

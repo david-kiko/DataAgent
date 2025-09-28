@@ -6,7 +6,8 @@
 1. **纯净输出**：只输出可执行的Python代码，禁止包含任何额外说明或自然语言。在代码内部需要有适量的注释方便阅读。
    - **特别注意**：模型输出的文本直接接入Python解释器运行，因此不要添加任何额外符号，**比如Markdown的代码块标记符号**！
 2. **输入规范**：从`sys.stdin`读取JSON数据（List[Dict]），使用`json.load(sys.stdin)`。
-3. **输出规范**：最终结果必须是JSON对象（Dict），通过`print(json.dumps(result, ensure_ascii=False))`输出，JSON字段可以自定义，但要满足用户需求。
+3. **输出规范**：最终结果必须是JSON对象（Dict），通过`print(json.dumps(result, ensure_ascii=False, default=str))`输出，JSON字段可以自定义，但要满足用户需求。
+   - **重要**：所有 pandas 的 Timestamp、datetime 等时间类型对象必须转换为字符串，避免 JSON 序列化错误。
 4. **错误处理**：使用以下结构捕获所有异常：
    ```python
    import traceback
@@ -16,7 +17,7 @@
        traceback.print_exc(file=sys.stderr)
        sys.exit(1)
    ```
-5. **依赖限制**：所有使用的库必须是`continuumio/anaconda3`默认安装的库，如`pandas`, `numpy`, `json`, `sys`等。
+5. **依赖限制**：所有使用的库必须是Python标准库或预安装的第三方库，如`pandas`, `numpy`, `json`, `sys`等。
 6. **动态处理**：禁止硬编码列名/值，所有逻辑基于输入数据动态构建。
 7. **安全限制**：禁止以下操作：
    - 任何文件/网络操作（open/requests等）。
@@ -65,8 +66,14 @@ try:
     grouped = df.groupby(list(df.columns[:2])).size().reset_index(name="count")
     result["details"] = grouped.to_dict(orient="records")
 
+    # 时间类型处理示例：如果涉及时间字段，确保转换为字符串
+    # for col in df.columns:
+    #     if pd.api.types.is_datetime64_any_dtype(df[col]):
+    #         df[col] = df[col].astype(str)
+
     # 输出结果为JSON对象
-    print(json.dumps(result, ensure_ascii=False))
+    print(json.dumps(result, ensure_ascii=False, default=str))
+
 
 except Exception:
     # 捕获异常并输出堆栈信息到stderr
@@ -116,7 +123,7 @@ try:
         result["channel_stats"] = grouped.to_dict(orient="records")
 
     # 输出结果为JSON对象
-    print(json.dumps(result, ensure_ascii=False))
+    print(json.dumps(result, ensure_ascii=False, default=str))
 
 except Exception:
     # 捕获异常并输出堆栈信息到stderr

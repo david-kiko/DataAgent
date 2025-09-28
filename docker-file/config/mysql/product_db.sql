@@ -14,7 +14,15 @@
  * limitations under the License.
  */
 
-CREATE DATABASE product_db;
+-- 设置客户端连接字符集
+SET NAMES utf8mb4;
+SET CHARACTER SET utf8mb4;
+SET character_set_client = utf8mb4;
+SET character_set_connection = utf8mb4;
+SET character_set_results = utf8mb4;
+
+CREATE DATABASE IF NOT EXISTS product_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 
 USE product_db;
 
@@ -24,7 +32,7 @@ CREATE TABLE users (
                        username VARCHAR(50) NOT NULL COMMENT '用户名',
                        email VARCHAR(100) NOT NULL COMMENT '用户邮箱',
                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '用户注册时间'
-) COMMENT='用户表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
 
 -- 商品表
 CREATE TABLE products (
@@ -33,7 +41,7 @@ CREATE TABLE products (
                           price DECIMAL(10,2) NOT NULL COMMENT '商品单价',
                           stock INT NOT NULL COMMENT '商品库存数量',
                           created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '商品上架时间'
-) COMMENT='商品表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商品表';
 
 -- 订单表
 CREATE TABLE orders (
@@ -43,7 +51,7 @@ CREATE TABLE orders (
                         total_amount DECIMAL(10,2) NOT NULL COMMENT '订单总金额',
                         status VARCHAR(20) DEFAULT 'pending' COMMENT '订单状态（pending/completed/cancelled等）',
                         FOREIGN KEY (user_id) REFERENCES users(id)
-) COMMENT='订单表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单表';
 
 -- 订单明细表
 CREATE TABLE order_items (
@@ -54,13 +62,13 @@ CREATE TABLE order_items (
                              unit_price DECIMAL(10,2) NOT NULL COMMENT '下单时商品单价',
                              FOREIGN KEY (order_id) REFERENCES orders(id),
                              FOREIGN KEY (product_id) REFERENCES products(id)
-) COMMENT='订单明细表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单明细表';
 
 -- 商品分类表
 CREATE TABLE categories (
                             id INT PRIMARY KEY AUTO_INCREMENT COMMENT '分类ID，主键自增',
                             name VARCHAR(50) NOT NULL COMMENT '分类名称'
-) COMMENT='商品分类表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商品分类表';
 
 -- 商品-分类关联表（多对多）
 CREATE TABLE product_categories (
@@ -69,7 +77,7 @@ CREATE TABLE product_categories (
                                     PRIMARY KEY (product_id, category_id),
                                     FOREIGN KEY (product_id) REFERENCES products(id),
                                     FOREIGN KEY (category_id) REFERENCES categories(id)
-) COMMENT='商品与分类关联表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商品与分类关联表';
 
 
 -- 插入用户数据
