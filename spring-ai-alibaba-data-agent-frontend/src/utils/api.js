@@ -19,7 +19,8 @@
  */
 
 // 这个是后端服务接口地址
-const API_BASE_URL = 'http://localhost:8065/api'
+// 在 Docker 环境中使用相对路径，让 nginx 代理处理
+const API_BASE_URL = '/api'
 
 /**
  * 发送 HTTP 请求的通用方法

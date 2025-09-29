@@ -54,16 +54,16 @@ spring:
     alibaba:
       nl2sql:
         code-executor:
-          # 运行Python代码的环境（生产环境建议使用docker，不建议使用local）
-          code-pool-executor: docker
-          host: tcp://localhost:2375
-          image-name: nl2sql-python-executor:1.0.0
-          container-name-prefix: nl2sql-python-exec-
-          limit-memory: 500
-          cpu-core: 1
-          code-timeout: 60s
-          container-timeout: 3000
-          network-mode: bridge
+          # 运行Python代码的环境（容器内使用local模式）
+          code-pool-executor: local
+          # host: tcp://localhost:2375
+          # image-name: nl2sql-python-executor:1.0.0
+          # container-name-prefix: nl2sql-python-exec-
+          # limit-memory: 500
+          # cpu-core: 1
+          # code-timeout: 60s
+          # container-timeout: 3000
+          # network-mode: bridge
         file:
           upload:
             path: ./uploads

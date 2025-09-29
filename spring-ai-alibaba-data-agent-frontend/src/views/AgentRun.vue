@@ -275,7 +275,6 @@
             class="report-preview-iframe"
             :srcdoc="previewReportContent"
             frameborder="0"
-            sandbox="allow-same-origin"
           ></iframe>
         </div>
       </div>
@@ -2320,8 +2319,13 @@ export default {
     }
 
     const generatePreviewReportContent = (message) => {
+      // 优先使用 originalContent，如果没有则使用 content
+      const contentToExtract = message.originalContent || message.content
+      console.log('generatePreviewReportContent: 使用内容类型:', message.originalContent ? 'originalContent' : 'content')
+      console.log('generatePreviewReportContent: 内容长度:', contentToExtract.length)
+      
       // 提取HTML内容
-      const htmlContent = extractHtmlContentFromMessage(message.content)
+      const htmlContent = extractHtmlContentFromMessage(contentToExtract)
 
       // 生成完整的HTML页面
       return `
@@ -2496,6 +2500,21 @@ export default {
       let htmlContent = ''
       let match
 
+      // 方法0: 处理JSON格式的存储内容
+      try {
+        if (messageContent.trim().startsWith('{') && messageContent.trim().endsWith('}')) {
+          console.log('检测到JSON格式，尝试解析...')
+          const jsonData = JSON.parse(messageContent)
+          if (jsonData.originalContent) {
+            console.log('从JSON中提取originalContent，长度:', jsonData.originalContent.length)
+            // 递归调用，处理originalContent中的HTML
+            return extractHtmlContentFromMessage(jsonData.originalContent)
+          }
+        }
+      } catch (e) {
+        console.log('JSON解析失败，继续其他方法:', e.message)
+      }
+
       // 方法1: 直接从原始消息内容中提取HTML代码块
       const htmlCodeBlockRegex = /```\s*html?\s*([\s\S]*?)```/gi
       htmlCodeBlockRegex.lastIndex = 0
@@ -2605,6 +2624,10 @@ export default {
           .replace(/class='dark'/gi, '')  // 移除暗色模式class（单引号）
           .replace(/<html[^>]*class="[^"]*dark[^"]*"[^>]*>/gi, '<html lang="zh-CN">')  // 移除html标签上的dark class
           .replace(/<html[^>]*class='[^']*dark[^']*'[^>]*>/gi, '<html lang="zh-CN">')  // 移除html标签上的dark class（单引号）
+          // 移除报告生成过程中的提示文本
+          .replace(/开始生成报告\.\.\.\s*```html\s*/gi, '')  // 移除"开始生成报告...```html"
+          .replace(/报告生成完成！\s*```\s*/gi, '')  // 移除"报告生成完成！```"
+          .replace(/```\s*报告生成完成！\s*/gi, '')  // 移除"```报告生成完成！"
           .trim()
 
         console.log('最终提取的HTML内容长度:', htmlContent.length)

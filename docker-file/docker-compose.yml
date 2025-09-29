@@ -36,51 +36,52 @@ services:
       timeout: 10s
       retries: 3
 
-  # # 后端服务
-  # backend:
-  #   build:
-  #     context: ..
-  #     dockerfile: ./docker-file/Dockerfile-backend
-  #     tags:
-  #       - saa-data-agent-backend:1.0.0.4-SNAPSHOT
-  #   container_name: data-agent-backend
-  #   environment:
-  #     - NL2SQL_DATASOURCE_URL=jdbc:mysql://mysql:3306/nl2sql_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-  #     - NL2SQL_DATASOURCE_USERNAME=root
-  #     - NL2SQL_DATASOURCE_PASSWORD=root
-  #     - AI_DASHSCOPE_API_KEY=${AI_DASHSCOPE_API_KEY}
-  #   ports:
-  #     - "8065:8065"
-  #   depends_on:
-  #     mysql:
-  #       condition: service_healthy
-  #     mysql-data:
-  #       condition: service_healthy
-  #     postgres-data:
-  #       condition: service_healthy
-  #   networks:
-  #     - app-network
-  #   restart: no
+  # 后端服务
+  backend:
+    image: 513180854/km-data-agent-backend:1.0.0
+    build:
+      context: ..
+      dockerfile: ./docker-file/Dockerfile-backend
+    container_name: data-agent-backend
+    environment:
+      - NL2SQL_DATASOURCE_URL=jdbc:mysql://mysql:3306/nl2sql_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      - NL2SQL_DATASOURCE_USERNAME=root
+      - NL2SQL_DATASOURCE_PASSWORD=root
+      - AI_DASHSCOPE_API_KEY=sk-0f5deaebb5a24c4e97605d59eb60ba24
+    ports:
+      - "8065:8065"
+    volumes:
+      - uploads-data:/app/uploads                # 挂载文件上传目录
+    depends_on:
+      mysql:
+        condition: service_healthy
+      # mysql-data:
+      #   condition: service_healthy
+      # postgres-data:
+      #   condition: service_healthy
+    networks:
+      - app-network
+    restart: no
 
-  # # Vue前端服务
-  # frontend:
-  #   build:
-  #     context: ..
-  #     dockerfile: ./docker-file/Dockerfile-frontend
-  #     tags:
-  #       - saa-data-agent-frontend:1.0.0.4-SNAPSHOT
-  #   container_name: data-agent-frontend
-  #   ports:
-  #     - "3000:3000"  # 只暴露前端端口
-  #   depends_on:
-  #     - backend
-  #   volumes:
-  #     - ./config/nginx.conf:/etc/nginx/nginx.conf
-  #   networks:
-  #     - app-network
-  #   restart: unless-stopped
+  # Vue前端服务
+  frontend:
+    image: 513180854/km-data-agent-frontend:1.0.0
+    build:
+      context: ..
+      dockerfile: ./docker-file/Dockerfile-frontend
+    container_name: data-agent-frontend
+    ports:
+      - "3000:3000"  # 只暴露前端端口
+    depends_on:
+      mysql:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - app-network
+    restart: unless-stopped
 
-  # MySQL 模拟数据源
+  #MySQL 模拟数据源
   mysql-data:
     image: mysql:8.0
     container_name: data-agent-mysql-datasource
@@ -97,9 +98,6 @@ services:
       - ./config/mysql:/docker-entrypoint-initdb.d
       - mysql-datasource-data:/var/lib/mysql
     command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --init-connect="SET NAMES utf8mb4" --skip-character-set-client-handshake
-    depends_on:
-      mysql:
-        condition: service_healthy
     healthcheck:
       test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD" ]
       interval: 30s
@@ -107,33 +105,34 @@ services:
       retries: 3
 
   # PostgreSQL 模拟数据源
-  postgres-data:
-    image: postgres:15
-    container_name: data-agent-postgres-datasource
-    restart: always
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
-    networks:
-      - app-network
-    volumes:
-      - ./config/postgres:/docker-entrypoint-initdb.d
-      - postgres-datasource-data:/var/lib/postgresql/data
-    depends_on:
-      mysql:
-        condition: service_healthy
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+  # postgres-data:
+  #   image: postgres:15
+  #   container_name: data-agent-postgres-datasource
+  #   restart: always
+  #   environment:
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: postgres
+  #   ports:
+  #     - "5432:5432"
+  #   networks:
+  #     - app-network
+  #   volumes:
+  #     - ./config/postgres:/docker-entrypoint-initdb.d
+  #     - postgres-datasource-data:/var/lib/postgresql/data
+  #   depends_on:
+  #     mysql:
+  #       condition: service_healthy
+  #   healthcheck:
+  #     test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
 
 volumes:
-  data-agent-mysql-inner-data:
+  nl2sql-mysql-inner-data:
+  uploads-data:            # 文件上传数据卷
   mysql-datasource-data:
-  postgres-datasource-data:
+  # postgres-datasource-data:
 
 networks:
   app-network:

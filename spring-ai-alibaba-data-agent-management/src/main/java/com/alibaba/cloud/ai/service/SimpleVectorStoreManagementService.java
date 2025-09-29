@@ -67,6 +67,9 @@ public class SimpleVectorStoreManagementService implements VectorStoreManagement
 				DashScopeEmbeddingOptions.builder()
 					.withModel(DashScopeApi.EmbeddingModel.EMBEDDING_V4.getValue())
 					.build());
+		
+		// 注意：SimpleVectorStore 默认使用内存存储，重启后数据会丢失
+		// 如需持久化，建议使用其他向量数据库如 Chroma、Milvus 等
 		this.vectorStore = SimpleVectorStore.builder(dashScopeEmbeddingModel).build();
 	}
 

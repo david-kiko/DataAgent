@@ -17,14 +17,30 @@ FROM openjdk:17-jdk-slim
 
 WORKDIR /app
 
-# 安装所需的软件
-RUN apt update && apt install -y maven git python3
+# 安装Python3和pip（用于代码执行）
+RUN apt update && apt install -y python3 python3-pip && rm -rf /var/lib/apt/lists/*
 
-# 下载DataAgent源码，用于构建
-RUN git clone https://github.com/spring-ai-alibaba/DataAgent.git \
-    && cd DataAgent && mvn install -DskipTests \
-    && cp ./spring-ai-alibaba-data-agent-management/target/spring-ai-alibaba-data-agent-management-0.1.0-SNAPSHOT.jar /app/app.jar \
-    && cd ..
+# 安装Python数据分析包
+RUN pip3 install --no-cache-dir \
+    pandas \
+    numpy \
+    scipy \
+    scikit-learn \
+    matplotlib \
+    seaborn \
+    plotly \
+    openpyxl \
+    xlrd \
+    sqlalchemy \
+    psycopg2-binary \
+    pymysql \
+    requests \
+    beautifulsoup4 \
+    lxml \
+    html5lib
+
+# 直接复制构建好的jar包
+COPY ./spring-ai-alibaba-data-agent-management/target/spring-ai-alibaba-data-agent-management-0.1.0-SNAPSHOT.jar /app/app.jar
 
 # 创建配置文件目录
 RUN mkdir -p /app/config

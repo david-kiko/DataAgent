@@ -45,6 +45,7 @@ public class AgentVectorStoreManager {
 
 	public AgentVectorStoreManager(EmbeddingModel embeddingModel) {
 		this.embeddingModel = embeddingModel;
+		
 		log.info("AgentVectorStoreManager initialized with EmbeddingModel: {}",
 				embeddingModel.getClass().getSimpleName());
 	}
@@ -61,6 +62,8 @@ public class AgentVectorStoreManager {
 
 		return agentStores.computeIfAbsent(agentId, id -> {
 			log.info("Creating new vector store for agent: {}", id);
+			// 注意：SimpleVectorStore 默认使用内存存储，重启后数据会丢失
+			// 如需持久化，建议使用其他向量数据库如 Chroma、Milvus 等
 			return SimpleVectorStore.builder(embeddingModel).build();
 		});
 	}

@@ -79,9 +79,10 @@ public class SimpleVectorStoreService extends BaseVectorStoreService {
 		this.dbConfig = dbConfig;
 		this.embeddingModel = embeddingModel;
 		this.agentVectorStoreManager = agentVectorStoreManager;
-		this.vectorStore = SimpleVectorStore.builder(embeddingModel).build(); // Keep
-																				// original
-																				// implementation
+		
+		// 注意：SimpleVectorStore 默认使用内存存储，重启后数据会丢失
+		// 如需持久化，建议使用其他向量数据库如 Chroma、Milvus 等
+		this.vectorStore = SimpleVectorStore.builder(embeddingModel).build(); // Keep original implementation
 		log.info("SimpleVectorStoreService initialized successfully with AgentVectorStoreManager");
 	}
 
