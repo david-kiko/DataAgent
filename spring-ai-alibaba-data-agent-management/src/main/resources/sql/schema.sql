@@ -204,3 +204,24 @@ CREATE TABLE IF NOT EXISTS user_prompt_config (
   INDEX idx_prompt_type_enabled_priority (prompt_type, enabled, priority DESC),
   INDEX idx_display_order (display_order ASC)
 ) ENGINE = InnoDB COMMENT = '用户Prompt配置表';
+
+-- 表关联关系表（用于自定义表关系，替代数据库外键约束）
+CREATE TABLE IF NOT EXISTS table_relation (
+  id INT NOT NULL AUTO_INCREMENT,
+  datasource_id INT COMMENT '数据源ID',
+  source_table VARCHAR(255) NOT NULL COMMENT '源表名',
+  source_column VARCHAR(255) NOT NULL COMMENT '源字段名',
+  target_table VARCHAR(255) NOT NULL COMMENT '目标表名',
+  target_column VARCHAR(255) NOT NULL COMMENT '目标字段名',
+  relation_type VARCHAR(50) DEFAULT 'foreign_key' COMMENT '关联类型：foreign_key-外键，reference-引用',
+  description TEXT COMMENT '关联关系描述',
+  is_active TINYINT(1) DEFAULT 1 COMMENT '是否启用：1-启用，0-禁用',
+  creator_id BIGINT COMMENT '创建者ID',
+  create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (id),
+  INDEX idx_datasource_id (datasource_id),
+  INDEX idx_source_table (source_table),
+  INDEX idx_target_table (target_table),
+  INDEX idx_is_active (is_active)
+) ENGINE = InnoDB COMMENT = '表关联关系表';

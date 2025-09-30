@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.alibaba.cloud.ai.mapper.TableRelationMapper">
+
+    <!-- 根据数据源ID获取表关联关系 -->
+    <select id="selectByDatasourceId" resultType="com.alibaba.cloud.ai.entity.TableRelation">
+        SELECT * FROM table_relation 
+        WHERE datasource_id = #{datasourceId}
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 根据数据源ID和表名获取关联关系 -->
+    <select id="selectByDatasourceIdAndTable" resultType="com.alibaba.cloud.ai.entity.TableRelation">
+        SELECT * FROM table_relation 
+        WHERE datasource_id = #{datasourceId}
+        AND (source_table = #{tableName} OR target_table = #{tableName})
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 根据数据源ID和状态获取关联关系 -->
+    <select id="selectByDatasourceIdAndStatus" resultType="com.alibaba.cloud.ai.entity.TableRelation">
+        SELECT * FROM table_relation 
+        WHERE datasource_id = #{datasourceId}
+        AND is_active = #{isActive}
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 获取所有启用的表关联关系（datasource_id为null的通用关系） -->
+    <select id="selectAllActiveRelations" resultType="com.alibaba.cloud.ai.entity.TableRelation">
+        SELECT * FROM table_relation 
+        WHERE is_active = 1
+        ORDER BY create_time DESC
+    </select>
+
+</mapper>

@@ -58,7 +58,8 @@ public class AgentVectorService {
 			String agentIdStr = String.valueOf(agentId);
 			log.info("Initializing schema for agent: {}", agentIdStr);
 
-			return vectorStoreService.schemaForAgent(agentIdStr, schemaInitRequest);
+			// 对于没有明确数据源ID的情况，传递null（使用通用关联关系）
+		return vectorStoreService.schemaForAgent(agentIdStr, schemaInitRequest, null);
 		}
 		catch (Exception e) {
 			log.error("Failed to initialize schema for agent: {}", agentId, e);
@@ -444,8 +445,8 @@ public class AgentVectorService {
 
 			log.info("Created SchemaInitRequest for agent: {}, dbConfig: {}, tables: {}", agentIdStr, dbConfig, tables);
 
-			// Call the original initialization method
-			return vectorStoreService.schemaForAgent(agentIdStr, schemaInitRequest);
+			// Call the original initialization method with datasource ID
+			return vectorStoreService.schemaForAgent(agentIdStr, schemaInitRequest, datasourceId);
 
 		}
 		catch (Exception e) {

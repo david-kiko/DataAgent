@@ -26,7 +26,8 @@ import com.alibaba.cloud.ai.request.DeleteRequest;
 import com.alibaba.cloud.ai.request.SchemaInitRequest;
 import com.alibaba.cloud.ai.request.SearchRequest;
 import com.alibaba.cloud.ai.service.base.BaseVectorStoreService;
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.alibaba.cloud.ai.service.TableRelationService;
+import com.alibaba.cloud.ai.service.DatasourceService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
@@ -69,9 +70,14 @@ public class SimpleVectorStoreService extends BaseVectorStoreService {
 
 	private final EmbeddingModel embeddingModel;
 
+	private final TableRelationService tableRelationService;
+
+	private final DatasourceService datasourceService;
+
 	@Autowired
 	public SimpleVectorStoreService(EmbeddingModel embeddingModel, ObjectMapper objectMapper,
-			AccessorFactory accessorFactory, DbConfig dbConfig, AgentVectorStoreManager agentVectorStoreManager) {
+			AccessorFactory accessorFactory, DbConfig dbConfig, AgentVectorStoreManager agentVectorStoreManager,
+			TableRelationService tableRelationService, DatasourceService datasourceService) {
 		log.info("Initializing SimpleVectorStoreService with EmbeddingModel: {}",
 				embeddingModel.getClass().getSimpleName());
 		this.objectMapper = objectMapper;
@@ -79,6 +85,8 @@ public class SimpleVectorStoreService extends BaseVectorStoreService {
 		this.dbConfig = dbConfig;
 		this.embeddingModel = embeddingModel;
 		this.agentVectorStoreManager = agentVectorStoreManager;
+		this.tableRelationService = tableRelationService;
+		this.datasourceService = datasourceService;
 		
 		// 注意：SimpleVectorStore 默认使用内存存储，重启后数据会丢失
 		// 如需持久化，建议使用其他向量数据库如 Chroma、Milvus 等
@@ -114,30 +122,77 @@ public class SimpleVectorStoreService extends BaseVectorStoreService {
 		deleteRequest.setVectorType("table");
 		deleteDocuments(deleteRequest);
 
-		log.debug("Fetching foreign keys from database");
-		List<ForeignKeyInfoBO> foreignKeyInfoBOS = dbAccessor.showForeignKeys(dbConfig, dqp);
-		log.debug("Found {} foreign keys", foreignKeyInfoBOS.size());
+		// 注释掉原来的数据库元数据获取外键关系的方式
+		// log.debug("Fetching foreign keys from database");
+		// List<ForeignKeyInfoBO> foreignKeyInfoBOS = dbAccessor.showForeignKeys(dbConfig, dqp);
+		// log.debug("Found {} foreign keys", foreignKeyInfoBOS.size());
+		
+		// 新的外键获取逻辑：从自定义表关联关系表获取
+		log.info("Fetching foreign keys from custom table_relation table");
+		// 对于全局schema方法，暂时使用null作为数据源ID（使用通用关联关系）
+		List<ForeignKeyInfoBO> foreignKeyInfoBOS = getForeignKeysFromCustomTable(dbConfig, null);
+		log.info("Found {} foreign keys from custom table_relation table", foreignKeyInfoBOS.size());
+		
 		Map<String, List<String>> foreignKeyMap = buildForeignKeyMap(foreignKeyInfoBOS);
 
-		log.debug("Fetching tables from database");
+		// 获取表信息
+		log.info("Fetching tables from database");
 		List<TableInfoBO> tableInfoBOS = dbAccessor.fetchTables(dbConfig, dqp);
 		log.info("Found {} tables to process", tableInfoBOS.size());
-
+		
+		// 批量获取所有表的字段信息和样本数据
+		Map<String, List<ColumnInfoBO>> tableColumnsMap = new HashMap<>();
+		Map<String, Map<String, List<String>>> tableColumnSamplesMap = new HashMap<>();
+		
+		log.info("Batch fetching columns and samples for all tables");
 		for (TableInfoBO tableInfoBO : tableInfoBOS) {
-			log.debug("Processing table: {}", tableInfoBO.getName());
-			processTable(tableInfoBO, dqp, dbConfig, foreignKeyMap);
+			String tableName = tableInfoBO.getName();
+			log.info("Processing table: {}", tableName);
+			
+			// 获取字段信息
+			DbQueryParameter columnParam = new DbQueryParameter();
+			columnParam.setSchema(dqp.getSchema());
+			columnParam.setTable(tableName);
+			List<ColumnInfoBO> columnInfoBOS = dbAccessor.showColumns(dbConfig, columnParam);
+			tableColumnsMap.put(tableName, columnInfoBOS);
+			
+			// 批量获取样本数据
+			List<String> columnNames = columnInfoBOS.stream()
+				.map(ColumnInfoBO::getName)
+				.collect(Collectors.toList());
+			Map<String, List<String>> columnSamplesMap = new HashMap<>();
+			for (String columnName : columnNames) {
+				DbQueryParameter sampleParam = new DbQueryParameter();
+				sampleParam.setSchema(dqp.getSchema());
+				sampleParam.setTable(tableName);
+				sampleParam.setColumn(columnName);
+				List<String> samples = dbAccessor.sampleColumn(dbConfig, sampleParam);
+				
+				// 处理样本数据
+				List<String> processedSamples = Optional.ofNullable(samples)
+					.orElse(new ArrayList<>())
+					.stream()
+					.filter(Objects::nonNull)
+					.distinct()
+					.limit(3)
+					.filter(s -> s.length() <= 100)
+					.collect(Collectors.toList());
+				columnSamplesMap.put(columnName, processedSamples);
+			}
+			tableColumnSamplesMap.put(tableName, columnSamplesMap);
 		}
 
-		log.debug("Converting columns to documents");
+		// 使用缓存的数据生成向量化文档
+		log.info("Converting columns to documents using cached data");
 		List<Document> columnDocuments = tableInfoBOS.stream().flatMap(table -> {
-			try {
-				dqp.setTable(table.getName());
-				return dbAccessor.showColumns(dbConfig, dqp).stream().map(column -> convertToDocument(table, column));
-			}
-			catch (Exception e) {
-				log.error("Error processing columns for table: {}", table.getName(), e);
-				throw new RuntimeException(e);
-			}
+			String tableName = table.getName();
+			List<ColumnInfoBO> columns = tableColumnsMap.get(tableName);
+			Map<String, List<String>> columnSamples = tableColumnSamplesMap.get(tableName);
+			
+			return columns.stream().map(column -> {
+				List<String> samples = columnSamples.get(column.getName());
+				return convertToDocumentWithSamples(table, column, samples);
+			});
 		}).collect(Collectors.toList());
 
 		log.info("Adding {} column documents to vector store", columnDocuments.size());
@@ -156,46 +211,6 @@ public class SimpleVectorStoreService extends BaseVectorStoreService {
 		return true;
 	}
 
-	private void processTable(TableInfoBO tableInfoBO, DbQueryParameter dqp, DbConfig dbConfig,
-			Map<String, List<String>> foreignKeyMap) throws Exception {
-		dqp.setTable(tableInfoBO.getName());
-		List<ColumnInfoBO> columnInfoBOS = dbAccessor.showColumns(dbConfig, dqp);
-		for (ColumnInfoBO columnInfoBO : columnInfoBOS) {
-			dqp.setColumn(columnInfoBO.getName());
-			List<String> sampleColumn = dbAccessor.sampleColumn(dbConfig, dqp);
-			sampleColumn = Optional.ofNullable(sampleColumn)
-				.orElse(new ArrayList<>())
-				.stream()
-				.filter(Objects::nonNull)
-				.distinct()
-				.limit(3)
-				.filter(s -> s.length() <= 100)
-				.toList();
-
-			columnInfoBO.setTableName(tableInfoBO.getName());
-			try {
-				columnInfoBO.setSamples(objectMapper.writeValueAsString(sampleColumn));
-			}
-			catch (JsonProcessingException e) {
-				columnInfoBO.setSamples("[]");
-			}
-		}
-
-		List<ColumnInfoBO> targetPrimaryList = columnInfoBOS.stream()
-			.filter(ColumnInfoBO::isPrimary)
-			.collect(Collectors.toList());
-		if (CollectionUtils.isNotEmpty(targetPrimaryList)) {
-			List<String> columnNames = targetPrimaryList.stream()
-				.map(ColumnInfoBO::getName)
-				.collect(Collectors.toList());
-			tableInfoBO.setPrimaryKeys(columnNames);
-		}
-		else {
-			tableInfoBO.setPrimaryKeys(new ArrayList<>());
-		}
-		tableInfoBO
-			.setForeignKey(String.join("、", foreignKeyMap.getOrDefault(tableInfoBO.getName(), new ArrayList<>())));
-	}
 
 	public Document convertToDocument(TableInfoBO tableInfoBO, ColumnInfoBO columnInfoBO) {
 		log.debug("Converting column to document: table={}, column={}", tableInfoBO.getName(), columnInfoBO.getName());
@@ -379,9 +394,10 @@ public class SimpleVectorStoreService extends BaseVectorStoreService {
 	 * Initialize database schema to vector store for specified agent
 	 * @param agentId agent ID
 	 * @param schemaInitRequest schema initialization request
+	 * @param datasourceId data source ID (optional, for custom table relations)
 	 * @throws Exception if an error occurs
 	 */
-	public Boolean schemaForAgent(String agentId, SchemaInitRequest schemaInitRequest) throws Exception {
+	public Boolean schemaForAgent(String agentId, SchemaInitRequest schemaInitRequest, Integer datasourceId) throws Exception {
 		log.info("Starting schema initialization for agent: {}, database: {}, schema: {}, tables: {}", agentId,
 				schemaInitRequest.getDbConfig().getUrl(), schemaInitRequest.getDbConfig().getSchema(),
 				schemaInitRequest.getTables());
@@ -395,32 +411,91 @@ public class SimpleVectorStoreService extends BaseVectorStoreService {
 		agentVectorStoreManager.deleteDocumentsByType(agentId, "column");
 		agentVectorStoreManager.deleteDocumentsByType(agentId, "table");
 
-		log.debug("Fetching foreign keys from database for agent: {}", agentId);
-		List<ForeignKeyInfoBO> foreignKeyInfoBOS = dbAccessor.showForeignKeys(dbConfig, dqp);
-		log.debug("Found {} foreign keys for agent: {}", foreignKeyInfoBOS.size(), agentId);
+		// 注释掉原来的数据库元数据获取外键关系的方式
+		// log.debug("Fetching foreign keys from database for agent: {}", agentId);
+		// List<ForeignKeyInfoBO> foreignKeyInfoBOS = dbAccessor.showForeignKeys(dbConfig, dqp);
+		// log.debug("Found {} foreign keys for agent: {}", foreignKeyInfoBOS.size(), agentId);
+		
+		// 新的外键获取逻辑：从自定义表关联关系表获取
+		log.info("Fetching foreign keys from custom table_relation table for agent: {}", agentId);
+		log.info("Using provided datasource ID: {} for database: {}", datasourceId, dbConfig.getUrl());
+		List<ForeignKeyInfoBO> foreignKeyInfoBOS = getForeignKeysFromCustomTable(dbConfig, datasourceId);
+		log.info("Found {} foreign keys from custom table_relation table for agent: {}", foreignKeyInfoBOS.size(), agentId);
+		
 		Map<String, List<String>> foreignKeyMap = buildForeignKeyMap(foreignKeyInfoBOS);
 
-		log.debug("Fetching tables from database for agent: {}", agentId);
+		// 获取表信息
+		log.info("Fetching tables from database for agent: {}", agentId);
 		List<TableInfoBO> tableInfoBOS = dbAccessor.fetchTables(dbConfig, dqp);
 		log.info("Found {} tables to process for agent: {}", tableInfoBOS.size(), agentId);
-
+		
+		// 批量获取所有表的字段信息和样本数据
+		Map<String, List<ColumnInfoBO>> tableColumnsMap = new HashMap<>();
+		Map<String, Map<String, List<String>>> tableColumnSamplesMap = new HashMap<>();
+		
+		log.info("Batch fetching columns and samples for all tables for agent: {}", agentId);
 		for (TableInfoBO tableInfoBO : tableInfoBOS) {
-			log.debug("Processing table: {} for agent: {}", tableInfoBO.getName(), agentId);
-			processTable(tableInfoBO, dqp, dbConfig, foreignKeyMap);
+			String tableName = tableInfoBO.getName();
+			log.info("Processing table: {} for agent: {}", tableName, agentId);
+			
+			// 获取字段信息
+			DbQueryParameter columnParam = new DbQueryParameter();
+			columnParam.setSchema(dqp.getSchema());
+			columnParam.setTable(tableName);
+			List<ColumnInfoBO> columnInfoBOS = dbAccessor.showColumns(dbConfig, columnParam);
+			tableColumnsMap.put(tableName, columnInfoBOS);
+			
+			// 批量获取样本数据
+			List<String> columnNames = columnInfoBOS.stream()
+				.map(ColumnInfoBO::getName)
+				.collect(Collectors.toList());
+			Map<String, List<String>> columnSamplesMap = new HashMap<>();
+			for (String columnName : columnNames) {
+				DbQueryParameter sampleParam = new DbQueryParameter();
+				sampleParam.setSchema(dqp.getSchema());
+				sampleParam.setTable(tableName);
+				sampleParam.setColumn(columnName);
+				List<String> samples = dbAccessor.sampleColumn(dbConfig, sampleParam);
+				
+				// 处理样本数据
+				List<String> processedSamples = Optional.ofNullable(samples)
+					.orElse(new ArrayList<>())
+					.stream()
+					.filter(Objects::nonNull)
+					.distinct()
+					.limit(3)
+					.filter(s -> s.length() <= 100)
+					.collect(Collectors.toList());
+				columnSamplesMap.put(columnName, processedSamples);
+			}
+			tableColumnSamplesMap.put(tableName, columnSamplesMap);
+			
+			// 设置表的主键和外键信息
+			List<ColumnInfoBO> targetPrimaryList = columnInfoBOS.stream()
+				.filter(ColumnInfoBO::isPrimary)
+				.collect(Collectors.toList());
+			if (CollectionUtils.isNotEmpty(targetPrimaryList)) {
+				List<String> primaryKeyNames = targetPrimaryList.stream()
+					.map(ColumnInfoBO::getName)
+					.collect(Collectors.toList());
+				tableInfoBO.setPrimaryKeys(primaryKeyNames);
+			} else {
+				tableInfoBO.setPrimaryKeys(new ArrayList<>());
+			}
+			tableInfoBO.setForeignKey(String.join("、", foreignKeyMap.getOrDefault(tableName, new ArrayList<>())));
 		}
 
-		log.debug("Converting columns to documents for agent: {}", agentId);
+		// 使用缓存的数据生成向量化文档
+		log.info("Converting columns to documents using cached data for agent: {}", agentId);
 		List<Document> columnDocuments = tableInfoBOS.stream().flatMap(table -> {
-			try {
-				dqp.setTable(table.getName());
-				return dbAccessor.showColumns(dbConfig, dqp)
-					.stream()
-					.map(column -> convertToDocumentForAgent(agentId, table, column));
-			}
-			catch (Exception e) {
-				log.error("Error processing columns for table: {} and agent: {}", table.getName(), agentId, e);
-				throw new RuntimeException(e);
-			}
+			String tableName = table.getName();
+			List<ColumnInfoBO> columns = tableColumnsMap.get(tableName);
+			Map<String, List<String>> columnSamples = tableColumnSamplesMap.get(tableName);
+			
+			return columns.stream().map(column -> {
+				List<String> samples = columnSamples.get(column.getName());
+				return convertToDocumentForAgentWithSamples(agentId, table, column, samples);
+			});
 		}).collect(Collectors.toList());
 
 		log.info("Adding {} column documents to vector store for agent: {}", columnDocuments.size(), agentId);
@@ -437,6 +512,63 @@ public class SimpleVectorStoreService extends BaseVectorStoreService {
 		log.info("Schema initialization completed successfully for agent: {}. Total documents added: {}", agentId,
 				columnDocuments.size() + tableDocuments.size());
 		return true;
+	}
+
+	/**
+	 * 优化版本：使用预获取的样本数据生成文档
+	 */
+	private Document convertToDocumentWithSamples(TableInfoBO tableInfoBO, ColumnInfoBO columnInfoBO, List<String> samples) {
+		log.debug("Converting column to document with samples: table={}, column={}", tableInfoBO.getName(), columnInfoBO.getName());
+
+		String text = Optional.ofNullable(columnInfoBO.getDescription()).orElse(columnInfoBO.getName());
+		String id = tableInfoBO.getName() + "." + columnInfoBO.getName();
+		Map<String, Object> metadata = new HashMap<>();
+		metadata.put("id", id);
+		metadata.put("name", columnInfoBO.getName());
+		metadata.put("tableName", tableInfoBO.getName());
+		metadata.put("description", Optional.ofNullable(columnInfoBO.getDescription()).orElse(""));
+		metadata.put("type", columnInfoBO.getType());
+		metadata.put("primary", columnInfoBO.isPrimary());
+		metadata.put("notnull", columnInfoBO.isNotnull());
+		metadata.put("vectorType", "column");
+		metadata.put("samples", samples);
+
+		// 构建包含样本数据的文本内容
+		StringBuilder contentBuilder = new StringBuilder(text);
+		if (samples != null && !samples.isEmpty()) {
+			contentBuilder.append(" 样本数据: ").append(String.join(", ", samples));
+		}
+
+		return new Document(contentBuilder.toString(), metadata);
+	}
+
+	/**
+	 * 优化版本：使用预获取的样本数据生成智能体文档
+	 */
+	private Document convertToDocumentForAgentWithSamples(String agentId, TableInfoBO tableInfoBO, ColumnInfoBO columnInfoBO, List<String> samples) {
+		log.debug("Converting column to document for agent with samples: {}, table={}, column={}", agentId, tableInfoBO.getName(), columnInfoBO.getName());
+
+		String text = Optional.ofNullable(columnInfoBO.getDescription()).orElse(columnInfoBO.getName());
+		String id = agentId + ":" + tableInfoBO.getName() + "." + columnInfoBO.getName();
+		Map<String, Object> metadata = new HashMap<>();
+		metadata.put("id", id);
+		metadata.put("agentId", agentId);
+		metadata.put("name", columnInfoBO.getName());
+		metadata.put("tableName", tableInfoBO.getName());
+		metadata.put("description", Optional.ofNullable(columnInfoBO.getDescription()).orElse(""));
+		metadata.put("type", columnInfoBO.getType());
+		metadata.put("primary", columnInfoBO.isPrimary());
+		metadata.put("notnull", columnInfoBO.isNotnull());
+		metadata.put("vectorType", "column");
+		metadata.put("samples", samples);
+
+		// 构建包含样本数据的文本内容
+		StringBuilder contentBuilder = new StringBuilder(text);
+		if (samples != null && !samples.isEmpty()) {
+			contentBuilder.append(" 样本数据: ").append(String.join(", ", samples));
+		}
+
+		return new Document(contentBuilder.toString(), metadata);
 	}
 
 	/**
@@ -567,6 +699,53 @@ public class SimpleVectorStoreService extends BaseVectorStoreService {
 			log.error("Error getting documents for agent: {}, falling back to global search", agentId, e);
 			return getDocuments(query, vectorType);
 		}
+	}
+
+	/**
+	 * 从自定义表关联关系表获取外键信息
+	 * @param dbConfig 数据库配置
+	 * @param datasourceId 数据源ID
+	 * @return 外键信息列表
+	 */
+	private List<ForeignKeyInfoBO> getForeignKeysFromCustomTable(DbConfig dbConfig, Integer datasourceId) {
+		log.info("Getting foreign keys from custom table_relation table for database: {}", dbConfig.getUrl());
+		log.info("Using datasource ID: {} for database: {}", datasourceId, dbConfig.getUrl());
+		
+		try {
+			// 从自定义表获取关联关系
+			List<ForeignKeyInfoBO> foreignKeys = tableRelationService.getForeignKeysForDatasource(datasourceId);
+			log.info("Retrieved {} foreign keys from table_relation table for datasource ID: {}", 
+				foreignKeys.size(), datasourceId);
+			
+			// 打印详细的外键信息
+			for (ForeignKeyInfoBO fk : foreignKeys) {
+				log.debug("Foreign key: {}.{} -> {}.{}", 
+					fk.getTable(), fk.getColumn(), 
+					fk.getReferencedTable(), fk.getReferencedColumn());
+			}
+			
+			return foreignKeys;
+		} catch (Exception e) {
+			log.error("Error getting foreign keys from custom table_relation table", e);
+			// 如果出错，返回空列表而不是抛出异常
+			return new ArrayList<>();
+		}
+	}
+
+	/**
+	 * 根据数据源配置获取数据源ID
+	 * 这里需要根据连接URL、数据库名等信息匹配数据源ID
+	 * @param dbConfig 数据库配置
+	 * @return 数据源ID，如果找不到则返回null
+	 */
+	/**
+	 * 根据数据源配置获取数据源ID（已废弃，现在直接传递数据源ID）
+	 * @deprecated 现在直接通过方法参数传递数据源ID，不再需要匹配
+	 */
+	@Deprecated
+	private Integer getDatasourceIdByConfig(DbConfig dbConfig) {
+		log.warn("getDatasourceIdByConfig is deprecated, datasource ID should be passed directly");
+		return null;
 	}
 
 }

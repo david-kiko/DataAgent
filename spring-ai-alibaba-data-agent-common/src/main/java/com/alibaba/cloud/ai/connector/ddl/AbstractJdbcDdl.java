@@ -23,7 +23,9 @@ import com.alibaba.cloud.ai.connector.bo.SchemaInfoBO;
 import com.alibaba.cloud.ai.connector.bo.TableInfoBO;
 
 import java.sql.Connection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public abstract class AbstractJdbcDdl implements Ddl {
 
@@ -41,6 +43,22 @@ public abstract class AbstractJdbcDdl implements Ddl {
 	public abstract List<ForeignKeyInfoBO> showForeignKeys(Connection connection, String schema, List<String> tables);
 
 	public abstract List<String> sampleColumn(Connection connection, String schema, String table, String column);
+
+	/**
+	 * 批量获取多个字段的样本数据
+	 * @param connection 数据库连接
+	 * @param schema 数据库schema
+	 * @param table 表名
+	 * @param columns 字段名列表
+	 * @return 字段名到样本数据的映射
+	 */
+	public Map<String, List<String>> batchSampleColumns(Connection connection, String schema, String table, List<String> columns) {
+		Map<String, List<String>> result = new HashMap<>();
+		for (String column : columns) {
+			result.put(column, sampleColumn(connection, schema, table, column));
+		}
+		return result;
+	}
 
 	public abstract ResultSetBO scanTable(Connection connection, String schema, String table);
 

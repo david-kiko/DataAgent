@@ -42,3 +42,11 @@ INSERT IGNORE INTO `agent_datasource` (`id`, `agent_id`, `datasource_id`, `is_ac
 (2, 2, 1, 1, NOW(), NOW()),  -- 销售数据分析智能体使用生产环境数据库
 (3, 3, 1, 1, NOW(), NOW()),  -- 财务报表智能体使用生产环境数据库
 (4, 4, 1, 1, NOW(), NOW());  -- 库存管理智能体使用生产环境数据库
+
+-- 表关联关系示例数据（针对product_db数据库的表关系）
+INSERT IGNORE INTO `table_relation` (`id`, `datasource_id`, `source_table`, `source_column`, `target_table`, `target_column`, `relation_type`, `description`, `is_active`, `creator_id`, `create_time`, `update_time`) VALUES 
+(1, 1, 'orders', 'user_id', 'users', 'id', 'foreign_key', '订单属于用户', 1, 2100246635, NOW(), NOW()),
+(2, 1, 'order_items', 'order_id', 'orders', 'id', 'foreign_key', '订单明细属于订单', 1, 2100246635, NOW(), NOW()),
+(3, 1, 'order_items', 'product_id', 'products', 'id', 'foreign_key', '订单明细包含商品', 1, 2100246635, NOW(), NOW()),
+(4, 1, 'product_categories', 'product_id', 'products', 'id', 'foreign_key', '商品分类关联商品', 1, 2100246635, NOW(), NOW()),
+(5, 1, 'product_categories', 'category_id', 'categories', 'id', 'foreign_key', '商品分类关联分类', 1, 2100246635, NOW(), NOW());
