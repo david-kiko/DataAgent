@@ -301,12 +301,12 @@ SELECT
   -- 系统字段
   wc.CENV as ENV,
   wc.CCREATOR_ID as CREATOR_ID,
-  creator.CCODE as CREATOR_CODE,
-  creator.CNAME as CREATOR_NAME,
+  creator_user.CCODE as CREATOR_CODE,
+  creator_user.CNAME as CREATOR_NAME,
   wc.CCREATE_TIME as CREATE_TIME,
   wc.CMODIFIER_ID as MODIFIER_ID,
-  modifier.CCODE as MODIFIER_CODE,
-  modifier.CNAME as MODIFIER_NAME,
+  modifier_user.CCODE as MODIFIER_CODE,
+  modifier_user.CNAME as MODIFIER_NAME,
   wc.CLATEST_UPDATE_TIME as LATEST_UPDATE_TIME
 FROM target.MOM_WORK_CENTER wc
 LEFT JOIN target.SYS_BIZ_ORG bo ON wc.CBIZ_ORG_ID = bo.CID AND bo.CSOFT_DELETE_FLAG = 0
@@ -320,12 +320,62 @@ LEFT JOIN target.MOM_WORK_CENTER_SUPPLIER_LINK wcsl ON wc.CID = wcsl.CSOURCE_ID 
 LEFT JOIN target.SYS_BIZ_ORG supplier ON wcsl.CSUPPLIER_ID = supplier.CID AND supplier.CSOFT_DELETE_FLAG = 0
 LEFT JOIN target.SYS_PERSON rp ON e.CRESPONSIBLE_PERSON_ID = rp.CID AND rp.CSOFT_DELETE_FLAG = 0
 LEFT JOIN target.SYS_BIZ_ORG ubo ON e.CUSING_BIZ_ORG_ID = ubo.CID AND ubo.CSOFT_DELETE_FLAG = 0
-LEFT JOIN target.SYS_PERSON creator ON wc.CCREATOR_ID = creator.CID AND creator.CSOFT_DELETE_FLAG = 0
-LEFT JOIN target.SYS_PERSON modifier ON wc.CMODIFIER_ID = modifier.CID AND modifier.CSOFT_DELETE_FLAG = 0
+LEFT JOIN target.SYS_USER creator_user ON wc.CCREATOR_ID = creator_user.CID AND creator_user.CSOFT_DELETE_FLAG = 0
+LEFT JOIN target.SYS_USER modifier_user ON wc.CMODIFIER_ID = modifier_user.CID AND modifier_user.CSOFT_DELETE_FLAG = 0
 WHERE wc.CSOFT_DELETE_FLAG = 0;
 
 -- =============================================
--- 3. 使用示例查询
+-- 3. 诊断查询 - 检查CREATOR_NAME为NULL的原因
+-- =============================================
+
+-- 检查工作中心表中的CREATOR_ID分布
+-- SELECT 
+--   COUNT(*) as total_records,
+--   COUNT(CCREATOR_ID) as creator_id_not_null,
+--   COUNT(*) - COUNT(CCREATOR_ID) as creator_id_null
+-- FROM target.MOM_WORK_CENTER 
+-- WHERE CSOFT_DELETE_FLAG = 0;
+
+-- 检查creator表关联情况
+-- SELECT 
+--   wc.CID as work_center_id,
+--   wc.CCREATOR_ID,
+--   creator_user.CID as creator_user_id,
+--   creator_user.CNAME as creator_name,
+--   creator_user.CSOFT_DELETE_FLAG
+-- FROM target.MOM_WORK_CENTER wc
+-- LEFT JOIN target.SYS_USER creator_user ON wc.CCREATOR_ID = creator_user.CID AND creator_user.CSOFT_DELETE_FLAG = 0
+-- WHERE wc.CSOFT_DELETE_FLAG = 0
+-- LIMIT 10;
+
+-- 改进的INSERT语句 - 添加调试信息
+-- 如果CREATOR_NAME仍然为NULL，可以尝试以下改进版本：
+/*
+INSERT INTO bi.MOM_WORK_CENTER_WIDE (
+  -- 字段列表保持不变...
+)
+SELECT
+  -- 其他字段保持不变...
+  
+  -- 系统字段 - 添加调试信息
+  wc.CENV as ENV,
+  wc.CCREATOR_ID as CREATOR_ID,
+  COALESCE(creator_user.CCODE, 'UNKNOWN_CREATOR_CODE') as CREATOR_CODE,
+  COALESCE(creator_user.CNAME, 'UNKNOWN_CREATOR_NAME') as CREATOR_NAME,
+  wc.CCREATE_TIME as CREATE_TIME,
+  wc.CMODIFIER_ID as MODIFIER_ID,
+  COALESCE(modifier_user.CCODE, 'UNKNOWN_MODIFIER_CODE') as MODIFIER_CODE,
+  COALESCE(modifier_user.CNAME, 'UNKNOWN_MODIFIER_NAME') as MODIFIER_NAME,
+  wc.CLATEST_UPDATE_TIME as LATEST_UPDATE_TIME
+FROM target.MOM_WORK_CENTER wc
+-- 其他JOIN保持不变...
+LEFT JOIN target.SYS_USER creator_user ON wc.CCREATOR_ID = creator_user.CID AND creator_user.CSOFT_DELETE_FLAG = 0
+LEFT JOIN target.SYS_USER modifier_user ON wc.CMODIFIER_ID = modifier_user.CID AND modifier_user.CSOFT_DELETE_FLAG = 0
+WHERE wc.CSOFT_DELETE_FLAG = 0;
+*/
+
+-- =============================================
+-- 4. 使用示例查询
 -- =============================================
 
 -- 查询某个工作中心的所有关联信息

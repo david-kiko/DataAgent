@@ -359,11 +359,23 @@ public abstract class BaseSchemaService {
 			columnDTO.setDescription((String) meta.get("description"));
 			columnDTO.setType((String) meta.get("type"));
 
-			String samplesStr = (String) meta.get("samples");
-			if (StringUtils.isNotBlank(samplesStr)) {
+			Object samplesObj = meta.get("samples");
+			if (samplesObj != null) {
 				try {
-					List<String> samples = objectMapper.readValue(samplesStr, new TypeReference<List<String>>() {
-					});
+					List<String> samples;
+					if (samplesObj instanceof String) {
+						String samplesStr = (String) samplesObj;
+						if (StringUtils.isNotBlank(samplesStr)) {
+							samples = objectMapper.readValue(samplesStr, new TypeReference<List<String>>() {
+							});
+						} else {
+							samples = new ArrayList<>();
+						}
+					} else if (samplesObj instanceof List) {
+						samples = (List<String>) samplesObj;
+					} else {
+						samples = new ArrayList<>();
+					}
 					columnDTO.setData(samples);
 				}
 				catch (Exception ignore) {
