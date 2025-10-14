@@ -157,8 +157,12 @@ public class SemanticModelDTO {
 	@Override
 	public String toString() {
 		return String.format("智能体字段名: %s, 数据库字段名: %s, 字段同义词: %s, 智能体字段描述: %s, 字段类型: %s, 数据库字段描述: %s",
-				getAgentFieldName(), getOriginalFieldName(), getFieldSynonyms(), getFieldDescription(), getFieldType(),
-				getOriginalDescription());
+				getAgentFieldName() != null ? getAgentFieldName() : "",
+				getOriginalFieldName() != null ? getOriginalFieldName() : "",
+				getFieldSynonyms() != null ? getFieldSynonyms() : "",
+				getFieldDescription() != null ? getFieldDescription() : "",
+				getFieldType() != null ? getFieldType() : "",
+				getOriginalDescription() != null ? getOriginalDescription() : "");
 	}
 
 }

@@ -318,6 +318,7 @@ import 'highlight.js/styles/github.css';
 import python from 'highlight.js/lib/languages/python';
 import sql from 'highlight.js/lib/languages/sql'
 import json from 'highlight.js/lib/languages/json'
+import { format } from 'sql-formatter'
 
 // 注册语言
 hljs.registerLanguage('python', python);
@@ -1128,6 +1129,315 @@ export default {
       }
     }
 
+    // 格式化Python执行结果
+    const formatPythonExecuteResult = (data) => {
+        if (!data) return '';
+        
+        const dataStr = data.toString();
+        console.log('🐍 Python执行结果原始数据:', dataStr);
+        console.log('🐍 数据长度:', dataStr.length);
+        
+        // 检查是否包含"开始执行Python代码..."和"Python代码执行成功!"
+        const hasExecutionMarkers = dataStr.includes('开始执行Python代码...') && dataStr.includes('Python代码执行成功!');
+        
+        if (hasExecutionMarkers) {
+            // 提取标准输出部分 - 支持多种格式
+            let stdOutputMatch = dataStr.match(/标准输出[：:]\s*```\s*([\s\S]*?)\s*```/);
+            if (!stdOutputMatch) {
+                // 如果没有找到```包围的格式，尝试直接匹配
+                stdOutputMatch = dataStr.match(/标准输出[：:]\s*([\s\S]*?)(?=Python代码执行成功!|$)/);
+            }
+            if (stdOutputMatch) {
+                const outputContent = stdOutputMatch[1].trim();
+                console.log('🐍 提取的标准输出内容:', outputContent);
+                console.log('🐍 输出内容长度:', outputContent.length);
+                
+                // 尝试解析JSON格式的输出
+                if (outputContent.startsWith('{') || outputContent.startsWith('[')) {
+                    console.log('🐍 检测到JSON格式，开始解析...');
+                    try {
+                        const parsed = JSON.parse(outputContent);
+                        const formattedJson = JSON.stringify(parsed, null, 2);
+                        console.log('🐍 JSON解析成功，格式化后的JSON:', formattedJson);
+                        
+                        return `
+                            <div class="python-execute-result" style="padding: 16px; border-radius: 8px; background: #f8f9fa; border: 1px solid #e9ecef; margin: 0;">
+                                <div class="execution-header" style="display: flex; align-items: center; margin-bottom: 12px; font-size: 15px; line-height: 1.2;">
+                                    <i class="bi bi-check-circle-fill" style="color: #27ae60; margin-right: 8px;"></i>
+                                    <span style="color: #27ae60; font-weight: 600;">Python代码执行成功!</span>
+                                </div>
+                                <div class="output-section">
+                                    <div class="output-label" style="color: #6c757d; font-size: 14px; margin-bottom: 8px; font-weight: 500;">标准输出:</div>
+                                    <div class="json-output" style="background: #ffffff; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px; overflow-x: auto;">
+                                        ${formatCodeWithHighlight(formattedJson, 'json')}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    } catch (e) {
+                        // JSON解析失败，显示原始输出
+                        console.log('🐍 JSON解析失败:', e);
+                        console.log('🐍 原始输出内容:', outputContent);
+                        return `
+                            <div class="python-execute-result" style="padding: 16px; border-radius: 8px; background: #f8f9fa; border: 1px solid #e9ecef; margin: 0;">
+                                <div class="execution-header" style="display: flex; align-items: center; margin-bottom: 12px; font-size: 15px; line-height: 1.2;">
+                                    <i class="bi bi-check-circle-fill" style="color: #27ae60; margin-right: 8px;"></i>
+                                    <span style="color: #27ae60; font-weight: 600;">Python代码执行成功!</span>
+                                </div>
+                                <div class="output-section">
+                                    <div class="output-label" style="color: #6c757d; font-size: 14px; margin-bottom: 8px; font-weight: 500;">标准输出:</div>
+                                    <div class="text-output" style="background: #ffffff; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px; overflow-x: auto;">
+                                        ${formatCodeWithHighlight(outputContent, 'text')}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                } else {
+                    // 非JSON格式的输出
+                    return `
+                        <div class="python-execute-result" style="padding: 16px; border-radius: 8px; background: #f8f9fa; border: 1px solid #e9ecef; margin: 0;">
+                            <div class="execution-header" style="display: flex; align-items: center; margin-bottom: 12px; font-size: 15px; line-height: 1.2;">
+                                <i class="bi bi-check-circle-fill" style="color: #27ae60; margin-right: 8px;"></i>
+                                <span style="color: #27ae60; font-weight: 600;">Python代码执行成功!</span>
+                            </div>
+                            <div class="output-section">
+                                <div class="output-label" style="color: #6c757d; font-size: 14px; margin-bottom: 8px; font-weight: 500;">标准输出:</div>
+                                <div class="text-output" style="background: #ffffff; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px; overflow-x: auto;">
+                                    ${formatCodeWithHighlight(outputContent, 'text')}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+        }
+        
+        // 如果没有找到预期的格式，返回原始数据
+        return `<pre style="background: #f8f9fa; padding: 12px; border-radius: 6px; border: 1px solid #e9ecef; overflow-x: auto; font-size: 13px; line-height: 1.4;"><code>${escapeHtml(dataStr)}</code></pre>`;
+    };
+
+    // 格式化SQL执行结果
+    const formatSqlExecuteResult = (data) => {
+        if (!data) return '';
+        
+        const dataStr = data.toString();
+        console.log('🔍 formatSqlExecuteResult - 输入数据长度:', dataStr.length);
+        console.log('🔍 formatSqlExecuteResult - 输入数据内容:', dataStr);
+        
+        // 检查是否包含"开始执行SQL..."和"执行SQL完成"
+        const hasExecutionMarkers = dataStr.includes('开始执行SQL...') && dataStr.includes('执行SQL完成');
+        console.log('🔍 formatSqlExecuteResult - 包含执行标记:', hasExecutionMarkers);
+        
+        if (hasExecutionMarkers) {
+            // 提取SQL查询部分
+            const sqlMatch = dataStr.match(/执行SQL查询\s*([\s\S]*?)(?=执行SQL完成|查询结果:|$)/);
+            console.log('🔍 formatSqlExecuteResult - SQL匹配结果:', sqlMatch);
+            let sqlContent = '';
+            if (sqlMatch) {
+                sqlContent = sqlMatch[1].trim();
+                console.log('🔍 formatSqlExecuteResult - 提取的SQL内容长度:', sqlContent.length);
+                console.log('🔍 formatSqlExecuteResult - 提取的SQL内容:', sqlContent);
+                // 移除代码块标记
+                sqlContent = sqlContent.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '');
+                console.log('🔍 formatSqlExecuteResult - 移除代码块标记后的SQL:', sqlContent);
+            }
+            
+            // 提取查询结果部分
+            const resultMatch = dataStr.match(/查询结果:\s*([\s\S]*?)(?=$)/);
+            let queryResult = '';
+            if (resultMatch) {
+                queryResult = resultMatch[1].trim();
+                // 移除代码块标记
+                queryResult = queryResult.replace(/^```json\s*\n?/, '').replace(/\n?```$/, '');
+            }
+            
+            if (sqlContent) {
+                // 格式化SQL（不修改SQL内容，因为后端能执行说明语法正确）
+                const formattedSql = formatSqlQuery(sqlContent);
+                
+                let resultSection = '';
+                if (queryResult) {
+                    try {
+                        // 尝试解析JSON并转换为表格
+                        const parsed = JSON.parse(queryResult);
+                        resultSection = formatQueryResultAsTable(parsed);
+                    } catch (e) {
+                        // JSON解析失败，显示原始结果
+                        resultSection = `
+                            <div class="result-section" style="margin-top: 16px;">
+                                <div class="result-label" style="color: #6c757d; font-size: 14px; margin-bottom: 8px; font-weight: 500;">查询结果:</div>
+                                <div class="result-output" style="background: #ffffff; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px; overflow-x: auto; max-height: 400px; overflow-y: auto;">
+                                    <pre style="margin: 0; font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 13px; line-height: 1.4; white-space: pre-wrap; word-break: break-word;">${escapeHtml(queryResult)}</pre>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+                
+                return `
+                    <div class="sql-execute-result" style="padding: 16px; border-radius: 8px; background: #f8f9fa; border: 1px solid #e9ecef; margin: 0;">
+                        <div class="execution-header" style="display: flex; align-items: center; margin-bottom: 12px; font-size: 15px; line-height: 1.2;">
+                            <i class="bi bi-check-circle-fill" style="color: #27ae60; margin-right: 8px;"></i>
+                            <span style="color: #27ae60; font-weight: 600;">SQL执行完成</span>
+                        </div>
+                        <div class="sql-section">
+                            <div class="sql-label" style="color: #6c757d; font-size: 14px; margin-bottom: 8px; font-weight: 500;">执行的SQL查询:</div>
+                            <div class="sql-output" style="background: #ffffff; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px; overflow-x: auto;">
+                                ${formatCodeWithHighlight(formattedSql, 'sql')}
+                            </div>
+                        </div>
+                        ${resultSection}
+                    </div>
+                `;
+            }
+        }
+        
+        // 如果没有找到预期的格式，返回原始数据
+        return `<pre style="background: #f8f9fa; padding: 12px; border-radius: 6px; border: 1px solid #e9ecef; overflow-x: auto; font-size: 13px; line-height: 1.4;"><code>${escapeHtml(dataStr)}</code></pre>`;
+    };
+
+
+    // 将查询结果格式化为美观的表格
+    const formatQueryResultAsTable = (queryData) => {
+        if (!queryData || !queryData.column || !Array.isArray(queryData.column)) {
+            return `
+                <div class="result-section" style="margin-top: 16px;">
+                    <div class="result-label" style="color: #6c757d; font-size: 14px; margin-bottom: 8px; font-weight: 500;">查询结果:</div>
+                    <div class="result-output" style="background: #ffffff; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px; text-align: center; color: #6c757d;">
+                        <i class="bi bi-info-circle" style="margin-right: 8px;"></i>
+                        无数据返回
+                    </div>
+                </div>
+            `;
+        }
+
+        const columns = queryData.column;
+        const data = queryData.data || [];
+        const errorMsg = queryData.errorMsg;
+
+        // 如果有错误信息，显示错误
+        if (errorMsg) {
+            return `
+                <div class="result-section" style="margin-top: 16px;">
+                    <div class="result-label" style="color: #dc3545; font-size: 14px; margin-bottom: 8px; font-weight: 500;">查询错误:</div>
+                    <div class="result-output" style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 6px; padding: 12px; color: #721c24;">
+                        <i class="bi bi-exclamation-triangle" style="margin-right: 8px;"></i>
+                        ${escapeHtml(errorMsg)}
+                    </div>
+                </div>
+            `;
+        }
+
+        // 生成表格HTML
+        let tableHtml = `
+            <div class="result-section" style="margin-top: 16px;">
+                <div class="result-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <div class="result-label" style="color: #6c757d; font-size: 14px; font-weight: 500;">查询结果:</div>
+                    <div class="result-stats" style="color: #6c757d; font-size: 12px;">
+                        <i class="bi bi-table" style="margin-right: 4px;"></i>
+                        ${data.length} 行 × ${columns.length} 列
+                    </div>
+                </div>
+                <div class="table-container" style="background: #ffffff; border: 1px solid #dee2e6; border-radius: 6px; overflow: hidden; max-height: 500px; overflow-y: auto;">
+                    <table class="query-result-table" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                        <thead style="background: #f8f9fa; position: sticky; top: 0; z-index: 10;">
+                            <tr>
+                                ${columns.map(col => `
+                                    <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #495057; border-bottom: 2px solid #dee2e6; white-space: nowrap;">
+                                        ${escapeHtml(col)}
+                                    </th>
+                                `).join('')}
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+
+        if (data.length === 0) {
+            tableHtml += `
+                <tr>
+                    <td colspan="${columns.length}" style="padding: 40px; text-align: center; color: #6c757d; font-style: italic;">
+                        <i class="bi bi-inbox" style="font-size: 24px; margin-bottom: 8px; display: block;"></i>
+                        暂无数据
+                    </td>
+                </tr>
+            `;
+        } else {
+            data.forEach((row, index) => {
+                const rowClass = index % 2 === 0 ? 'background: #ffffff;' : 'background: #f8f9fa;';
+                tableHtml += `
+                    <tr style="${rowClass}">
+                        ${columns.map(col => {
+                            const value = row[col] !== null && row[col] !== undefined ? row[col] : '';
+                            return `
+                                <td style="padding: 12px 16px; border-bottom: 1px solid #dee2e6; word-break: break-word; max-width: 200px;">
+                                    ${escapeHtml(String(value))}
+                                </td>
+                            `;
+                        }).join('')}
+                    </tr>
+                `;
+            });
+        }
+
+        tableHtml += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        return tableHtml;
+    };
+
+    // 统一的代码格式化函数 - 使用highlight.js
+    const formatCodeWithHighlight = (code, language) => {
+        if (!code) return '';
+        
+        // 清理数据 - 移除可能的Markdown代码块标记
+        let cleanedData = code.replace(/^```\s*\w*\s*/i, '').replace(/```\s*$/, '').trim();
+        
+        // 创建code元素
+        const codeElement = document.createElement('code');
+        codeElement.className = `language-${language}`;
+        codeElement.textContent = cleanedData;
+        
+        // 高亮代码
+        hljs.highlightElement(codeElement);
+        
+        // 创建pre元素并包装code元素
+        const preElement = document.createElement('pre');
+        preElement.appendChild(codeElement);
+        
+        return preElement.outerHTML;
+    };
+
+    // SQL格式化函数 - 使用专业的sql-formatter库
+    const formatSqlQuery = (sql) => {
+        if (!sql) return '';
+        
+        try {
+            // 使用sql-formatter进行格式化
+            const formatted = format(sql, {
+                language: 'sql', // 使用标准SQL方言
+                tabWidth: 2,     // 缩进宽度
+                useTabs: false,  // 使用空格而不是制表符
+                keywordCase: 'upper', // 关键字大写
+                functionCase: 'upper', // 函数名大写
+                identifierCase: 'lower', // 标识符小写
+                linesBetweenQueries: 1, // 查询之间的空行数
+                denseOperators: false,  // 操作符周围不添加额外空格
+                newlineBeforeSemicolon: false, // 分号前不换行
+                params: [] // 参数占位符
+            });
+            
+            return formatted;
+        } catch (error) {
+            console.warn('SQL格式化失败，使用原始SQL:', error);
+            return sql; // 格式化失败时返回原始SQL
+        }
+    };
+
     const formatContentByType = (type, data) => {
         console.log('📞📞📞 formatContentByType被调用！类型:', type, '数据长度:', data?.toString().length)
 
@@ -1230,6 +1540,17 @@ export default {
         if (type === 'result') {
             return convertJsonToHTMLTable(data);
         }
+
+        // 专门处理Python执行结果
+        if (type === 'python_execute') {
+            return formatPythonExecuteResult(data);
+        }
+
+        // 专门处理SQL执行结果
+        if (type === 'execute_sql') {
+            return formatSqlExecuteResult(data);
+        }
+
 
         let processedData = data;
         
@@ -2058,7 +2379,11 @@ export default {
       const reportSectionMatch = messageContent.match(/<div class="agent-response-block"[^>]*>\s*<i class="bi bi-file-earmark-text"><\/i>\s*输出报告[\s\S]*?<\/div>\s*<div class="agent-response-content">([\s\S]*?)<\/div>/i)
       
       if (reportSectionMatch) {
-        const reportContent = reportSectionMatch[1]
+        let reportContent = reportSectionMatch[1]
+        
+        // 清理流式内容中的多余文本
+        reportContent = cleanStreamingContent(reportContent)
+        
         if (format === 'markdown') {
           return convertHtmlToMarkdown(reportContent)
         } else {
@@ -2073,7 +2398,11 @@ export default {
         for (let i = allResponseBlocks.length - 1; i >= 0; i--) {
           const blockMatch = allResponseBlocks[i].match(/<div class="agent-response-content">([\s\S]*?)<\/div>/)
           if (blockMatch && blockMatch[1].includes('数据分析报告')) {
-            const reportContent = blockMatch[1]
+            let reportContent = blockMatch[1]
+            
+            // 清理流式内容中的多余文本
+            reportContent = cleanStreamingContent(reportContent)
+            
             if (format === 'markdown') {
               return convertHtmlToMarkdown(reportContent)
             } else {
@@ -2086,14 +2415,24 @@ export default {
       // 方法3: 简单的文本匹配（后备方案）
       if (format === 'markdown') {
         const markdownMatch = messageContent.match(/数据分析报告[\s\S]*/i)
-        return markdownMatch ? markdownMatch[0] : messageContent
+        return markdownMatch ? cleanStreamingContent(markdownMatch[0]) : messageContent
       } else {
         const htmlReportMatch = messageContent.match(/(.*?数据分析报告[\s\S]*)/i)
         if (htmlReportMatch) {
-          return htmlReportMatch[1]
+          return cleanStreamingContent(htmlReportMatch[1])
         }
         return messageContent
       }
+    }
+    
+    // 清理流式内容中的多余文本
+    const cleanStreamingContent = (content) => {
+      return content
+        .replace(/^开始生成报告\.\.\.\s*/, '')  // 移除开头的"开始生成报告..."
+        .replace(/\s*报告生成完成！\s*$/, '')    // 移除结尾的"报告生成完成！"
+        .replace(/^```html\s*/, '')            // 移除开头的```html
+        .replace(/\s*```\s*$/, '')             // 移除结尾的```
+        .trim()
     }
     
     // 添加HTML转Markdown的辅助函数
@@ -2120,6 +2459,20 @@ export default {
     }
     
     const generateHTMLReportFromMessage = (content) => {
+      // 提取纯HTML内容，去除代码块标记和流式内容
+      let cleanContent = content
+        .replace(/^开始生成报告\.\.\.\s*/, '')  // 移除开头的"开始生成报告..."
+        .replace(/\s*报告生成完成！\s*$/, '')    // 移除结尾的"报告生成完成！"
+        .replace(/^```html\s*/, '')            // 移除开头的```html
+        .replace(/\s*```\s*$/, '')             // 移除结尾的```
+        .trim()
+      
+      // 如果内容已经是完整的HTML文档，直接返回
+      if (cleanContent.includes('<!DOCTYPE html>')) {
+        return cleanContent
+      }
+      
+      // 否则添加简单的包装
       return `
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -2142,12 +2495,8 @@ export default {
     </style>
 </head>
 <body>
-    <div class="report-header">
-        <div class="report-title">数据分析报告</div>
-        <div class="report-meta">导出时间: ${new Date().toLocaleString('zh-CN')}</div>
-    </div>
     <div class="report-content">
-        ${content}
+        ${cleanContent}
     </div>
 </body>
 </html>`
@@ -2625,6 +2974,10 @@ export default {
           .replace(/<html[^>]*class="[^"]*dark[^"]*"[^>]*>/gi, '<html lang="zh-CN">')  // 移除html标签上的dark class
           .replace(/<html[^>]*class='[^']*dark[^']*'[^>]*>/gi, '<html lang="zh-CN">')  // 移除html标签上的dark class（单引号）
           // 移除报告生成过程中的提示文本
+          .replace(/^开始生成报告\.\.\.\s*/, '')  // 移除开头的"开始生成报告..."
+          .replace(/\s*报告生成完成！\s*$/, '')    // 移除结尾的"报告生成完成！"
+          .replace(/^```html\s*/, '')            // 移除开头的```html
+          .replace(/\s*```\s*$/, '')             // 移除结尾的```
           .replace(/开始生成报告\.\.\.\s*```html\s*/gi, '')  // 移除"开始生成报告...```html"
           .replace(/报告生成完成！\s*```\s*/gi, '')  // 移除"报告生成完成！```"
           .replace(/```\s*报告生成完成！\s*/gi, '')  // 移除"```报告生成完成！"

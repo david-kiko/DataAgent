@@ -33,6 +33,7 @@ import reactor.core.publisher.Flux;
 import java.util.List;
 import java.util.Map;
 
+import static com.alibaba.cloud.ai.constant.Constant.BUSINESS_KNOWLEDGE;
 import static com.alibaba.cloud.ai.constant.Constant.EVIDENCES;
 import static com.alibaba.cloud.ai.constant.Constant.PLAN_CURRENT_STEP;
 import static com.alibaba.cloud.ai.constant.Constant.SEMANTIC_CONSISTENCY_NODE_OUTPUT;
@@ -66,6 +67,7 @@ public class SemanticConsistencyNode extends AbstractPlanBasedNode {
 		// Get necessary input parameters
 		List<String> evidenceList = StateUtils.getListValue(state, EVIDENCES);
 		SchemaDTO schemaDTO = StateUtils.getObjectValue(state, TABLE_RELATION_OUTPUT, SchemaDTO.class);
+		String businessKnowledge = StateUtils.getStringValue(state, BUSINESS_KNOWLEDGE, "");
 
 		// Get current execution step and SQL query
 		ExecutionStep executionStep = getCurrentExecutionStep(state);
@@ -77,7 +79,7 @@ public class SemanticConsistencyNode extends AbstractPlanBasedNode {
 		logger.info("Step description: {}", toolParameters.getDescription());
 
 		Flux<ChatResponse> validationResultFlux = performSemanticValidationStream(schemaDTO, evidenceList,
-				toolParameters, sqlQuery);
+				toolParameters, sqlQuery, businessKnowledge);
 
 		var generator = StreamingChatGeneratorUtil.createStreamingGeneratorWithMessages(this.getClass(), state,
 				"开始语义一致性校验", "语义一致性校验完成", validationResult -> {
@@ -109,14 +111,14 @@ public class SemanticConsistencyNode extends AbstractPlanBasedNode {
 	 * Perform streaming semantic consistency validation
 	 */
 	private Flux<ChatResponse> performSemanticValidationStream(SchemaDTO schemaDTO, List<String> evidenceList,
-			ExecutionStep.ToolParameters toolParameters, String sqlQuery) throws Exception {
+			ExecutionStep.ToolParameters toolParameters, String sqlQuery, String businessKnowledge) throws Exception {
 		// Build validation context
 		String schema = PromptHelper.buildMixMacSqlDbPrompt(schemaDTO, true);
 		String evidence = StringUtils.join(evidenceList, ";\n");
 		String context = String.join("\n", schema, evidence, toolParameters.getDescription());
 
-		// Execute semantic consistency check
-		return baseNl2SqlService.semanticConsistencyStream(sqlQuery, context);
+		// Execute semantic consistency check with business knowledge
+		return baseNl2SqlService.semanticConsistencyStream(sqlQuery, context, businessKnowledge);
 	}
 
 	/**

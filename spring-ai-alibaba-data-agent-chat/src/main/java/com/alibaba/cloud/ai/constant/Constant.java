@@ -35,6 +35,7 @@ public final class Constant {
 
 	public static final String QUERY_REWRITE_NODE_OUTPUT = "QUERY_REWRITE_NODE_OUTPUT";
 
+
 	public static final String KEYWORD_EXTRACT_NODE_OUTPUT = "KEYWORD_EXTRACT_NODE_OUTPUT";
 
 	public static final String EVIDENCES = "EVIDENCES";

@@ -210,6 +210,12 @@ public class BaseNl2SqlService {
 		return aiService.streamCall(semanticConsistencyPrompt);
 	}
 
+	public Flux<ChatResponse> semanticConsistencyStream(String sql, String queryPrompt, String businessKnowledge) throws Exception {
+		String semanticConsistencyPrompt = PromptHelper.buildSemanticConsistenPrompt(queryPrompt, sql, businessKnowledge);
+		logger.info("semanticConsistencyPrompt with business knowledge = {}", semanticConsistencyPrompt);
+		return aiService.streamCall(semanticConsistencyPrompt);
+	}
+
 	/**
 	 * Expand question into multiple differently expressed question variants
 	 * @param query original question
@@ -346,6 +352,8 @@ public class BaseNl2SqlService {
 		}
 
 		String result = MarkdownParser.extractRawText(newSql).trim();
+		logger.info("LLM原始返回: {}", newSql);
+		logger.info("MarkdownParser提取后: {}", result);
 		logger.info("Final generated SQL: {}", result);
 		return result;
 	}

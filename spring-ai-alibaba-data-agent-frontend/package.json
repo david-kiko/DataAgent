@@ -9,12 +9,13 @@
     "serve": "vite preview"
   },
   "dependencies": {
-    "vue": "^3.4.0",
-    "vue-router": "^4.2.0",
     "axios": "^1.6.0",
+    "bootstrap-icons": "^1.11.1",
     "highlight.js": "^11.9.0",
     "marked": "^11.0.0",
-    "bootstrap-icons": "^1.11.1"
+    "sql-formatter": "^15.6.10",
+    "vue": "^3.4.0",
+    "vue-router": "^4.2.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.0",

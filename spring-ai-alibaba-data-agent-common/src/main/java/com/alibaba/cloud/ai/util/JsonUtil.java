@@ -32,10 +32,20 @@ public class JsonUtil {
 
 	public static String toJson(StreamResponseType type, String data) {
 		try {
-			return objectMapper.writeValueAsString(Map.of("type", type.getValue(), "data", data));
+			String result = objectMapper.writeValueAsString(Map.of("type", type.getValue(), "data", data));
+			// 添加日志来调试JSON序列化
+			if (data != null && data.contains("```")) {
+				System.out.println("JsonUtil.toJson - 输入数据长度: " + data.length());
+				System.out.println("JsonUtil.toJson - 输入数据: [" + data + "]");
+				System.out.println("JsonUtil.toJson - 输出JSON长度: " + result.length());
+				System.out.println("JsonUtil.toJson - 输出JSON: [" + result + "]");
+			}
+			return result;
 		}
 		catch (JsonProcessingException e) {
-			return "{\"type\":\"" + type.getValue() + "\",\"data\":\"" + data.replace("\"", "\\\"") + "\"}";
+			String fallback = "{\"type\":\"" + type.getValue() + "\",\"data\":\"" + data.replace("\"", "\\\"") + "\"}";
+			System.out.println("JsonUtil.toJson - JSON序列化失败，使用fallback: " + fallback);
+			return fallback;
 		}
 	}
 

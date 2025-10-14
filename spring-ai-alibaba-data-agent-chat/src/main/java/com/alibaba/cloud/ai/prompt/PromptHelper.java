@@ -244,6 +244,15 @@ public class PromptHelper {
 		Map<String, Object> params = new HashMap<>();
 		params.put("nl_req", nlReq);
 		params.put("sql", sql);
+		params.put("business_knowledge", ""); // 默认空值，保持向后兼容
+		return PromptConstant.getSemanticConsistencyPromptTemplate().render(params);
+	}
+
+	public static String buildSemanticConsistenPrompt(String nlReq, String sql, String businessKnowledge) {
+		Map<String, Object> params = new HashMap<>();
+		params.put("nl_req", nlReq);
+		params.put("sql", sql);
+		params.put("business_knowledge", businessKnowledge != null ? businessKnowledge : "");
 		return PromptConstant.getSemanticConsistencyPromptTemplate().render(params);
 	}
 
@@ -289,16 +298,55 @@ public class PromptHelper {
 
 	public static String buildBusinessKnowledgePrompt(List<BusinessKnowledgeDTO> businessKnowledgeDTOS) {
 		Map<String, Object> params = new HashMap<>();
-		String businessKnowledge = CollectionUtils.isEmpty(businessKnowledgeDTOS) ? ""
-				: StringUtils.join(businessKnowledgeDTOS, ";\n");
+		String businessKnowledge;
+		if (CollectionUtils.isEmpty(businessKnowledgeDTOS)) {
+			businessKnowledge = "";
+		} else {
+			// 手动拼接每个业务知识条目，避免toString()方法问题
+			StringBuilder sb = new StringBuilder();
+			for (int i = 0; i < businessKnowledgeDTOS.size(); i++) {
+				BusinessKnowledgeDTO dto = businessKnowledgeDTOS.get(i);
+				sb.append("业务名词: ").append(dto.getBusinessTerm() != null ? dto.getBusinessTerm() : "")
+				  .append(", 描述: ").append(dto.getDescription() != null ? dto.getDescription() : "")
+				  .append(", 同义词: ").append(dto.getSynonyms() != null ? dto.getSynonyms() : "");
+				if (i < businessKnowledgeDTOS.size() - 1) {
+					sb.append(";\n");
+				}
+			}
+			businessKnowledge = sb.toString();
+			
+			// 添加调试日志
+			System.out.println("DEBUG: Business knowledge count: " + businessKnowledgeDTOS.size());
+			System.out.println("DEBUG: Formatted knowledge: " + businessKnowledge);
+		}
 		params.put("businessKnowledge", businessKnowledge);
-		return PromptConstant.getBusinessKnowledgePromptTemplate().render(params);
+		String result = PromptConstant.getBusinessKnowledgePromptTemplate().render(params);
+		System.out.println("DEBUG: Final business knowledge prompt: " + result);
+		return result;
 	}
 
 	public static String buildSemanticModelPrompt(List<SemanticModelDTO> semanticModelDTOS) {
 		Map<String, Object> params = new HashMap<>();
-		String semanticModel = CollectionUtils.isEmpty(semanticModelDTOS) ? ""
-				: StringUtils.join(semanticModelDTOS, ";\n");
+		String semanticModel;
+		if (CollectionUtils.isEmpty(semanticModelDTOS)) {
+			semanticModel = "";
+		} else {
+			// 手动拼接每个语义模型条目，避免toString()方法问题
+			StringBuilder sb = new StringBuilder();
+			for (int i = 0; i < semanticModelDTOS.size(); i++) {
+				SemanticModelDTO dto = semanticModelDTOS.get(i);
+				sb.append("智能体字段名: ").append(dto.getAgentFieldName() != null ? dto.getAgentFieldName() : "")
+				  .append(", 数据库字段名: ").append(dto.getOriginalFieldName() != null ? dto.getOriginalFieldName() : "")
+				  .append(", 字段同义词: ").append(dto.getFieldSynonyms() != null ? dto.getFieldSynonyms() : "")
+				  .append(", 智能体字段描述: ").append(dto.getFieldDescription() != null ? dto.getFieldDescription() : "")
+				  .append(", 字段类型: ").append(dto.getFieldType() != null ? dto.getFieldType() : "")
+				  .append(", 数据库字段描述: ").append(dto.getOriginalDescription() != null ? dto.getOriginalDescription() : "");
+				if (i < semanticModelDTOS.size() - 1) {
+					sb.append(";\n");
+				}
+			}
+			semanticModel = sb.toString();
+		}
 		params.put("semanticModel", semanticModel);
 		return PromptConstant.getSemanticModelPromptTemplate().render(params);
 	}

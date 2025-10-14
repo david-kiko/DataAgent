@@ -19,7 +19,9 @@ import com.alibaba.cloud.ai.dto.BusinessKnowledgeDTO;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
+import org.springframework.util.CollectionUtils;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -51,6 +53,58 @@ public class BusinessKnowledgeRecallService {
 					rs.getObject("is_recall", Boolean.class), // defaultRecall (convert to
 																// Boolean)
 					rs.getString("data_set_id") // datasetId
+			);
+		});
+	}
+
+	/**
+	 * Get relevant business knowledge by keywords for intelligent recall
+	 * @param dataSetId dataset ID
+	 * @param keywords extracted keywords from user query
+	 * @return list of relevant business knowledge
+	 */
+	public List<BusinessKnowledgeDTO> getRelevantKnowledgeByKeywords(String dataSetId, List<String> keywords) {
+		// If no keywords provided, fallback to full recall
+		if (CollectionUtils.isEmpty(keywords)) {
+			return getFieldByDataSetId(dataSetId);
+		}
+
+		// Build dynamic SQL for keyword matching
+		StringBuilder sqlBuilder = new StringBuilder();
+		sqlBuilder.append("SELECT business_term, description, synonyms, is_recall, data_set_id ");
+		sqlBuilder.append("FROM business_knowledge WHERE data_set_id = ? AND is_recall = 1 AND (");
+
+		List<Object> params = new ArrayList<>();
+		params.add(dataSetId);
+
+		// Add keyword matching conditions
+		for (int i = 0; i < keywords.size(); i++) {
+			if (i > 0) {
+				sqlBuilder.append(" OR ");
+			}
+			sqlBuilder.append("(business_term LIKE ? OR description LIKE ? OR synonyms LIKE ?)");
+			String keyword = "%" + keywords.get(i) + "%";
+			params.add(keyword);
+			params.add(keyword);
+			params.add(keyword);
+		}
+		sqlBuilder.append(") ");
+
+		// Add intelligent ordering: exact business_term match first, then by length
+		if (!keywords.isEmpty()) {
+			sqlBuilder.append("ORDER BY ");
+			sqlBuilder.append("CASE WHEN business_term LIKE ? THEN 1 ELSE 2 END, "); // business_term exact match priority
+			sqlBuilder.append("LENGTH(business_term) ASC"); // shorter terms first
+			params.add("%" + keywords.get(0) + "%"); // first keyword for ordering
+		}
+
+		return this.jdbcTemplate.query(sqlBuilder.toString(), params.toArray(), (rs, rowNum) -> {
+			return new BusinessKnowledgeDTO(
+				rs.getString("business_term"),
+				rs.getString("description"),
+				rs.getString("synonyms"),
+				rs.getObject("is_recall", Boolean.class),
+				rs.getString("data_set_id")
 			);
 		});
 	}

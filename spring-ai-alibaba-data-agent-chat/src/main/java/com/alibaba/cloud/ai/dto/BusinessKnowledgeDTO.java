@@ -105,4 +105,12 @@ public class BusinessKnowledgeDTO {
 		this.agentId = agentId;
 	}
 
+	@Override
+	public String toString() {
+		return String.format("业务名词: %s, 描述: %s, 同义词: %s",
+				businessTerm != null ? businessTerm : "",
+				description != null ? description : "",
+				synonyms != null ? synonyms : "");
+	}
+
 }

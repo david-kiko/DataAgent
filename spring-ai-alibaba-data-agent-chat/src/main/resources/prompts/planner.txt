@@ -56,17 +56,18 @@ Based on the user's question, the following relevant database schemas have been 
 
 # DATA-CENTRIC CHAIN OF THOUGHT (Internal Monologue)
 
-1.  **Understand Goal**: What is the user's ultimate business question? (e.g., "Analyze lead conversion quality").
-2.  **Analyze Provided Schema**: I will examine the `\{schema\}` block. Do I have columns for `region`, `city`, `channel`, `lead_creation_time`, and columns representing different conversion stages (e.g., `lead_id`, `store_visit_id`, `test_drive_id`, `deal_id`)? I will confirm all necessary fields are present before proceeding.
-3.  **Identify Key Metrics/Dimensions**: What needs to be measured? (e.g., Conversion Rate = (Action / Previous Action)). What are the breakdowns? (e.g., by Region, by Channel).
-4.  **Plan Tool Sequence**:
+1.  **Understand Goal**: What is the user's ultimate business question? (e.g., "Analyze lead conversion quality"). Consider any business terminology from the business knowledge context that may help clarify the user's intent.
+2.  **Analyze Business Context**: Review the business knowledge and semantic model to understand domain-specific terms, synonyms, and field mappings that may be relevant to the user's query.
+3.  **Analyze Provided Schema**: I will examine the `\{schema\}` block. Do I have columns for `region`, `city`, `channel`, `lead_creation_time`, and columns representing different conversion stages (e.g., `lead_id`, `store_visit_id`, `test_drive_id`, `deal_id`)? I will confirm all necessary fields are present before proceeding.
+4.  **Identify Key Metrics/Dimensions**: What needs to be measured? (e.g., Conversion Rate = (Action / Previous Action)). What are the breakdowns? (e.g., by Region, by Channel). Use business knowledge to ensure metrics align with domain standards.
+5.  **Plan Tool Sequence**:
     *   Schema is provided, so no discovery needed.
     *   *Need to calculate conversion rates by channel?* -> Use `SQL_EXECUTE_NODE`.
     *   *Need to calculate conversion rates by region?* -> Use `SQL_EXECUTE_NODE` (separate query for clarity).
     *   *Need to find the TOP 5, or calculate trends?* -> Use `PYTHON_EXECUTE_NODE` on the SQL results.
     *   *Need to summarize everything and give advice?* -> Use `REPORT_GENERATOR_NODE`.
-5.  **Formulate Instructions**: For each step, what is the precise command? Write the exact SQL for `SQL_EXECUTE_NODE`. Write the clear, high-level instruction for `PYTHON_EXECUTE_NODE`. Write the final narrative for `REPORT_GENERATOR_NODE`. Crucially, I will add a concise `description` for each `tool_parameters` object.
-6.  **Construct Final JSON**: Assemble the plan into the specified JSON format.
+6.  **Formulate Instructions**: For each step, what is the precise command? Write the exact SQL for `SQL_EXECUTE_NODE`. Write the clear, high-level instruction for `PYTHON_EXECUTE_NODE`. Write the final narrative for `REPORT_GENERATOR_NODE`. Crucially, I will add a concise `description` for each `tool_parameters` object.
+7.  **Construct Final JSON**: Assemble the plan into the specified JSON format.
 
 # OUTPUT FORMAT (MUST be a valid JSON object)
 
@@ -161,3 +162,11 @@ CREATE TABLE leads_table_7864 (
 # User's Current Request
 
 **User Input**: "{user_question}"
+
+**Business Knowledge Context**: The following business knowledge provides domain-specific terminology and concepts that may be relevant to understanding the user's query above. Use this knowledge to better interpret business terms and concepts mentioned in the user's question.
+
+{business_knowledge}
+
+**Semantic Model Context**: The following semantic model provides field mappings and business context for database columns. Use this information to understand how business concepts map to database fields.
+
+{semantic_model}

@@ -80,6 +80,8 @@ public class SqlExecuteNode extends AbstractPlanBasedNode {
 		ExecutionStep.ToolParameters toolParameters = executionStep.getToolParameters();
 		String sqlQuery = toolParameters.getSqlQuery();
 
+		logger.info("从ToolParameters获取的SQL: [{}]", sqlQuery);
+		logger.info("SQL长度: {}", sqlQuery != null ? sqlQuery.length() : 0);
 		logger.info("Executing SQL query: {}", sqlQuery);
 		logger.info("Step description: {}", toolParameters.getDescription());
 
@@ -209,8 +211,16 @@ public class SqlExecuteNode extends AbstractPlanBasedNode {
 			Flux<ChatResponse> displayFlux = Flux.create(emitter -> {
 				emitter.next(ChatResponseUtil.createStatusResponse("开始执行SQL..."));
 				emitter.next(ChatResponseUtil.createStatusResponse("执行SQL查询"));
+				logger.info("发送给前端的SQL内容: [{}]", sqlQuery);
 				emitter.next(ChatResponseUtil.createStatusResponse("```" + sqlQuery + "```"));
 				emitter.next(ChatResponseUtil.createStatusResponse("执行SQL完成"));
+				
+				// 添加查询结果到流式显示中
+				if (jsonStr != null && !jsonStr.trim().isEmpty()) {
+					emitter.next(ChatResponseUtil.createStatusResponse("查询结果:"));
+					emitter.next(ChatResponseUtil.createStatusResponse("```json\n" + jsonStr + "\n```"));
+				}
+				
 				emitter.complete();
 			});
 

@@ -91,6 +91,7 @@ public class TableRelationNode implements NodeAction {
 		// Get necessary input parameters
 		String input = StateUtils.getStringValue(state, INPUT_KEY);
 		List<String> evidenceList = StateUtils.getListValue(state, EVIDENCES);
+		List<String> keywords = StateUtils.getListValue(state, KEYWORD_EXTRACT_NODE_OUTPUT);
 		List<Document> tableDocuments = StateUtils.getDocumentList(state, TABLE_DOCUMENTS_FOR_SCHEMA_OUTPUT);
 		List<List<Document>> columnDocumentsByKeywords = StateUtils.getDocumentListList(state,
 				COLUMN_DOCUMENTS_BY_KEYWORDS_OUTPUT);
@@ -108,9 +109,12 @@ public class TableRelationNode implements NodeAction {
 		List<BusinessKnowledgeDTO> businessKnowledges;
 		List<SemanticModelDTO> semanticModel;
 		try {
-			// Extract business knowledge and semantic model
-			businessKnowledges = businessKnowledgeRecallService.getFieldByDataSetId(dataSetId);
+			// Extract business knowledge using keywords for intelligent recall
+			businessKnowledges = businessKnowledgeRecallService.getRelevantKnowledgeByKeywords(dataSetId, keywords);
 			semanticModel = semanticModelRecallService.getFieldByDataSetId(String.valueOf(agentId));
+			
+			logger.info("[{}] Business knowledge recall - Keywords: {}, Retrieved count: {}", 
+					this.getClass().getSimpleName(), keywords, businessKnowledges.size());
 		}
 		catch (DataAccessException e) {
 			logger.warn("Database query failed (attempt {}): {}", retryCount + 1, e.getMessage());

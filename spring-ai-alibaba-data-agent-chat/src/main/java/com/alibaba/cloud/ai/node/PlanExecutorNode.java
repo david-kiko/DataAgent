@@ -121,13 +121,23 @@ public class PlanExecutorNode extends AbstractPlanBasedNode {
 		// Check if the plan is completed
 		if (currentStep > executionPlan.size()) {
 			logger.info("Plan completed, current step: {}, total steps: {}", currentStep, executionPlan.size());
-			// 如果为nl2sql模式，则将结果保存，直接走向END
+			
+			// 检查计划中是否包含报告生成步骤
+			boolean hasReportStep = executionPlan.stream()
+				.anyMatch(step -> REPORT_GENERATOR_NODE.equals(step.getToolToUse()));
+			
+			// 如果为nl2sql模式或者计划中没有报告生成步骤，则将结果保存，直接走向END
 			Boolean onlyNl2sql = state.value(IS_ONLY_NL2SQL, false);
-			if (onlyNl2sql) {
-				String resultSql = executionPlan.get(0).getToolParameters().getSqlQuery();
-				logger.info("Nl2sql Result: {}", resultSql);
-				return Map.of(PLAN_CURRENT_STEP, 1, PLAN_NEXT_NODE, StateGraph.END, PLAN_VALIDATION_STATUS, true,
-						ONLY_NL2SQL_OUTPUT, resultSql);
+			if (onlyNl2sql || !hasReportStep) {
+				if (onlyNl2sql) {
+					String resultSql = executionPlan.get(0).getToolParameters().getSqlQuery();
+					logger.info("Nl2sql Result: {}", resultSql);
+					return Map.of(PLAN_CURRENT_STEP, 1, PLAN_NEXT_NODE, StateGraph.END, PLAN_VALIDATION_STATUS, true,
+							ONLY_NL2SQL_OUTPUT, resultSql);
+				} else {
+					logger.info("Plan does not contain report generation step, ending execution");
+					return Map.of(PLAN_CURRENT_STEP, 1, PLAN_NEXT_NODE, StateGraph.END, PLAN_VALIDATION_STATUS, true);
+				}
 			}
 			return Map.of(PLAN_CURRENT_STEP, 1, PLAN_NEXT_NODE, REPORT_GENERATOR_NODE, PLAN_VALIDATION_STATUS, true);
 		}

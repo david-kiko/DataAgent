@@ -42,14 +42,15 @@ Based on the user's question, the following relevant database schemas have been 
 
 # DATA-CENTRIC CHAIN OF THOUGHT (Internal Monologue)
 
-1.  **Understand Goal**: What is the user's ultimate business question?
-2.  **Analyze Schema**: Check if the schema contains all the necessary fields (e.g., metrics, dimensions, date fields).
-3.  **Formulate SQL**:
+1.  **Understand Goal**: What is the user's ultimate business question? Consider any business terminology from the business knowledge context that may help clarify the user's intent.
+2.  **Analyze Business Context**: Review the business knowledge and semantic model to understand domain-specific terms, synonyms, and field mappings that may be relevant to the user's query.
+3.  **Analyze Schema**: Check if the schema contains all the necessary fields (e.g., metrics, dimensions, date fields). Use semantic model to map business concepts to database fields.
+4.  **Formulate SQL**:
     *   Identify the main table and required columns.
     *   Apply filters (e.g., time range).
     *   Group by required dimensions.
     *   Aggregate the necessary metrics.
-4.  **Construct Final JSON**: Assemble the SQL and description into the specified JSON format.
+5.  **Construct Final JSON**: Assemble the SQL and description into the specified JSON format.
 
 # OUTPUT FORMAT (MUST be a valid JSON object)
 
@@ -119,3 +120,11 @@ CREATE TABLE leads_table_7864 (
 # User's Current Request
 
 **User Input**: "{user_question}"
+
+**Business Knowledge Context**: The following business knowledge provides domain-specific terminology and concepts that may be relevant to understanding the user's query above. Use this knowledge to better interpret business terms and concepts mentioned in the user's question.
+
+{business_knowledge}
+
+**Semantic Model Context**: The following semantic model provides field mappings and business context for database columns. Use this information to understand how business concepts map to database fields.
+
+{semantic_model}

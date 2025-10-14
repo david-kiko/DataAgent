@@ -46,6 +46,7 @@ public enum StreamResponseType {
 	 */
 	RESULT("result"),
 
+
 	/**
 	 * Represents the extracted keywords.
 	 */
