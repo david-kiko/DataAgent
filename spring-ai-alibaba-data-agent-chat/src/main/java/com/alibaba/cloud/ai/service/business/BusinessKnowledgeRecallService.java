@@ -19,9 +19,7 @@ import com.alibaba.cloud.ai.dto.BusinessKnowledgeDTO;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
-import org.springframework.util.CollectionUtils;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -64,6 +62,11 @@ public class BusinessKnowledgeRecallService {
 	 * @return list of relevant business knowledge
 	 */
 	public List<BusinessKnowledgeDTO> getRelevantKnowledgeByKeywords(String dataSetId, List<String> keywords) {
+		// 暂时不过滤，直接返回所有业务知识
+		// TODO: 后续可以重新启用关键词过滤逻辑
+		return getFieldByDataSetId(dataSetId);
+		
+		/* 原始的关键词过滤逻辑，暂时注释掉
 		// If no keywords provided, fallback to full recall
 		if (CollectionUtils.isEmpty(keywords)) {
 			return getFieldByDataSetId(dataSetId);
@@ -107,6 +110,7 @@ public class BusinessKnowledgeRecallService {
 				rs.getString("data_set_id")
 			);
 		});
+		*/
 	}
 
 }

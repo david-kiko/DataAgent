@@ -68,7 +68,7 @@ public class Nl2SqlService {
 		if (agentId == null) {
 			agentId = "";
 		}
-		Map<String, Object> stateMap = Map.of(IS_ONLY_NL2SQL, true, INPUT_KEY, naturalQuery, AGENT_ID, agentId);
+		Map<String, Object> stateMap = Map.of(IS_ONLY_NL2SQL, false, INPUT_KEY, naturalQuery, AGENT_ID, agentId);
 		Optional<OverAllState> call = this.nl2sqlGraph.call(stateMap);
 		OverAllState state = call.orElseThrow(() -> {
 			logger.error("Nl2SqlService call fail, stateMap: {}", stateMap);
@@ -98,7 +98,7 @@ public class Nl2SqlService {
 	 */
 	public CompletableFuture<Void> nl2sqlWithProcess(Consumer<Nl2SqlProcessVO> nl2SqlProcessConsumer,
 			String naturalQuery, String agentId, RunnableConfig runnableConfig) throws GraphRunnerException {
-		Map<String, Object> stateMap = Map.of(IS_ONLY_NL2SQL, true, INPUT_KEY, naturalQuery, AGENT_ID, agentId);
+		Map<String, Object> stateMap = Map.of(IS_ONLY_NL2SQL, false, INPUT_KEY, naturalQuery, AGENT_ID, agentId);
 		Consumer<NodeOutput> consumer = (output) -> {
 			Nl2SqlProcessVO sqlProcess = this.nodeOutputToNl2sqlProcess(output);
 			nl2SqlProcessConsumer.accept(sqlProcess);

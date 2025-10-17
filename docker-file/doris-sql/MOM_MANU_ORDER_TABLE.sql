@@ -1,0 +1,126 @@
+drop table bi.MOM_MANU_ORDER;
+CREATE TABLE bi.`MOM_MANU_ORDER` (
+  `CID` bigint NOT NULL COMMENT "对象",
+  `CINTEGRATION_SYSTEM` varchar(256) NULL COMMENT "集成系统",
+  `CPROD_PLAN_TYPE` varchar(256) NULL COMMENT "枚举值: [PPT_050_PROCESS:零部件加工计划, PPT_030_PRODUCE:零部件生产计划, PPT_010_NONE:无]",
+  `CBIZ_ORG_ID` bigint NULL COMMENT "所属组织ID",
+  `CBIZ_ORG_NAME` varchar(512) NULL COMMENT "所属组织名称",
+  `CCODE` varchar(512) NULL COMMENT "编码",
+  `CORDER_TYPE` varchar(256) NULL COMMENT "订单类型 [OT_010_STANDARD:标准]",
+  `CPRIORITY` int NULL COMMENT "优先级",
+  `CUNIT` varchar(255) NULL COMMENT "计量单位",
+  `CBOM_ENTITY_TYPE` varchar(256) NULL,
+  `CPLANNED_START_TIME` datetime NULL COMMENT "计划开始时间",
+  `CCREATOR_ID` bigint NULL COMMENT "创建者ID",
+  `CPLANNED_QTY` decimal(38,9) NULL COMMENT "计划数量",
+  `CROUTING_ENTITY_TYPE` varchar(256) NULL,
+  `CROUTING_ID` bigint NULL COMMENT "工艺路线ID",
+  `CMANU_MODEL` varchar(256) NULL COMMENT "制造型号",
+  `CBOM_ID` bigint NULL COMMENT "物料清单ID",
+  `CMATERIAL_ENTITY_TYPE` varchar(256) NULL,
+  `CPLANNER_ID` bigint NULL COMMENT "计划员ID",
+  `CACTUAL_END_TIME` datetime NULL COMMENT "实际结束时间",
+  `CACTUAL_START_TIME` datetime NULL COMMENT "实际开始时间",
+  `CPLANNED_END_TIME` datetime NULL COMMENT "计划结束时间",
+  `CSCRAPPED_QTY` decimal(38,9) NULL COMMENT "报废数量",
+  `CQUALIFIED_QTY` decimal(38,9) NULL COMMENT "合格数量",
+  `CLATEST_UPDATE_TIME` datetime NULL COMMENT "最近修改时间",
+  `CMODIFIER_ENTITY_TYPE` varchar(256) NULL,
+  `CMODIFIER_ID` bigint NULL COMMENT "修改者ID",
+  `CCREATE_TIME` datetime NULL COMMENT "创建时间",
+  `CCREATOR_ENTITY_TYPE` varchar(256) NULL,
+  `CENTITY_TYPE` varchar(256) NULL COMMENT "实体类型",
+  `CMATERIAL_ID` bigint NULL COMMENT "物料ID",
+  `CSECURITY_LEVEL` varchar(256) NULL COMMENT "密级",
+  `CREMARK` varchar(1024) NULL COMMENT "备注",
+  `CNAME` varchar(512) NULL COMMENT "名称",
+  `CENV` varchar(80) NULL COMMENT "环境标识",
+  `CSOFT_DELETE_FLAG` int NULL COMMENT "软删除标记",
+  `CPROD_SCHEDULE_STATE` varchar(256) NULL COMMENT "枚举值: [PSS_030_PRODUCE:零部件生产已排产, PSS_010_NONE:无]",
+  `CRELEASED_QTY` decimal(38,9) NULL COMMENT "已释放数量",
+  `CFACTORY_ENTITY_TYPE` varchar(256) NULL,
+  `CFACTORY_ID` bigint NULL COMMENT "所属工厂ID",
+  `CBIZ_ORG_ENTITY_TYPE` varchar(256) NULL,
+  `CLIFECYCLE_TEMPLATE` varchar(512) NULL COMMENT "生命周期模板",
+  `CLIFECYCLE_STATE` varchar(256) NULL COMMENT "生命周期状态 [PO_020_PUBLISHED:已发布, PO_030_EXPANDED:已展开, PO_040_RELEASED:已释放, PO_050_STARTED:已开工, PO_060_FINISHED:已完工, PO_070_CLOSED:已关闭, PO_010_CREATED:已创建]",
+  `CPLANNER_ENTITY_TYPE` varchar(256) NULL,
+  `CLIFECYCLE_STATE_TYPE` varchar(256) NULL COMMENT "生命周期阶段",
+  `CIMPORT_TIME` datetime NULL COMMENT "集成创建时间",
+  `CINTEGRATION_ID` varchar(512) NULL COMMENT "集成数据主键",
+  `CRELEASED_STATUS` varchar(80) NULL COMMENT "释放状态 [PO_030_ALL:全部释放, PO_020_PART:部分释放, PO_010_NO:未释放]",
+  `CPLANNED_OUTPUT_QTY` decimal(38,9) NULL COMMENT "计划产出数量",
+  `CCONTROL_STATUS` varchar(256) NULL COMMENT "控制状态 [CS_020_PAUSED:暂停, CS_010_NORMAL:正常, CS_030_TERMINATION:终止, CS_030_CANCEL:取消, CS_040_CANCEL:已取消]"
+) ENGINE=OLAP
+UNIQUE KEY(`CID`)
+COMMENT '生产订单'
+DISTRIBUTED BY HASH(`CID`) BUCKETS 10
+PROPERTIES (
+"replication_allocation" = "tag.location.default: 1",
+"min_load_replica_num" = "-1",
+"is_being_synced" = "false",
+"storage_medium" = "hdd",
+"storage_format" = "V2",
+"inverted_index_storage_format" = "V2",
+"compression" = "LZ4",
+"enable_unique_key_merge_on_write" = "true",
+"light_schema_change" = "true",
+"disable_auto_compaction" = "false",
+"enable_single_replica_compaction" = "false",
+"group_commit_interval_ms" = "10000",
+"group_commit_data_bytes" = "134217728",
+"enable_mow_light_delete" = "false"
+);
+
+insert into bi.`MOM_MANU_ORDER`
+select t1.`CID`
+  ,t1.`CINTEGRATION_SYSTEM`
+  ,t1.`CPROD_PLAN_TYPE`
+  ,t1.`CBIZ_ORG_ID`
+  ,so.CNAME as CBIZ_ORG_NAME
+  ,t1.`CCODE`
+  ,t1.`CORDER_TYPE`
+  ,t1.`CPRIORITY`
+  ,t1.`CUNIT`
+  ,t1.`CBOM_ENTITY_TYPE`
+  ,t1.`CPLANNED_START_TIME`
+  ,t1.`CCREATOR_ID`
+  ,t1.`CPLANNED_QTY`
+  ,t1.`CROUTING_ENTITY_TYPE`
+  ,t1.`CROUTING_ID`
+  ,t1.`CMANU_MODEL`
+  ,t1.`CBOM_ID`
+  ,t1.`CMATERIAL_ENTITY_TYPE`
+  ,t1.`CPLANNER_ID`
+  ,t1.`CACTUAL_END_TIME`
+  ,t1.`CACTUAL_START_TIME`
+  ,t1.`CPLANNED_END_TIME`
+  ,t1.`CSCRAPPED_QTY`
+  ,t1.`CQUALIFIED_QTY`
+  ,t1.`CLATEST_UPDATE_TIME`
+  ,t1.`CMODIFIER_ENTITY_TYPE`
+  ,t1.`CMODIFIER_ID`
+  ,t1.`CCREATE_TIME`
+  ,t1.`CCREATOR_ENTITY_TYPE`
+  ,t1.`CENTITY_TYPE`
+  ,t1.`CMATERIAL_ID`
+  ,t1.`CSECURITY_LEVEL`
+  ,t1.`CREMARK`
+  ,t1.`CNAME`
+  ,t1.`CENV`
+  ,t1.`CSOFT_DELETE_FLAG`
+  ,t1.`CPROD_SCHEDULE_STATE`
+  ,t1.`CRELEASED_QTY`
+  ,t1.`CFACTORY_ENTITY_TYPE`
+  ,t1.`CFACTORY_ID`
+  ,t1.`CBIZ_ORG_ENTITY_TYPE`
+  ,t1.`CLIFECYCLE_TEMPLATE`
+  ,t1.`CLIFECYCLE_STATE`
+  ,t1.`CPLANNER_ENTITY_TYPE`
+  ,t1.`CLIFECYCLE_STATE_TYPE`
+  ,t1.`CIMPORT_TIME`
+  ,t1.`CINTEGRATION_ID`
+  ,t1.`CRELEASED_STATUS`
+  ,t1.`CPLANNED_OUTPUT_QTY`
+  ,t1.`CCONTROL_STATUS`
+from target.MOM_MANU_ORDER t1 left join target.SYS_BIZ_ORG so on t1.CBIZ_ORG_ID = so.CID
+where t1.CSOFT_DELETE_FLAG=0

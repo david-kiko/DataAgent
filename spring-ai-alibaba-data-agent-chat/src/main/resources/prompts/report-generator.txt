@@ -81,7 +81,7 @@ css
   
   ### 图表渲染要求（重要）
   - **图表容器尺寸**：所有图表容器必须设置明确的尺寸，使用class="chart-container"并定义CSS样式：width: 100\%; height: 320px; min-height: 320px;
-  - **JavaScript执行时机**：JavaScript代码必须使用document.addEventListener('DOMContentLoaded', function() 确保DOM加载完成后再初始化图表
+  - **JavaScript执行时机**：JavaScript代码必须使用document.addEventListener("DOMContentLoaded", function() 确保DOM加载完成后再初始化图表。**重要**：整个页面只能有一个DOMContentLoaded监听器，所有JavaScript代码（包括主题切换、数字动画、图表初始化）都必须放在同一个DOMContentLoaded事件处理器内部，严禁创建多个DOMContentLoaded监听器
   - **ECharts库检查**：必须检查ECharts库是否加载成功：if (typeof echarts === 'undefined') 则输出错误信息并返回
   - **图表容器样式**：chart-container必须包含以下CSS样式，确保即使图表加载失败也有视觉反馈：
     ```css
@@ -115,8 +115,34 @@ css
     4. 使用try-catch包装图表初始化过程
     5. 初始化ECharts实例
     6. 设置图表配置选项
-    7. 图表加载成功后添加chart-loaded类隐藏加载提示
+    7. 图表加载成功后使用setTimeout延迟100毫秒添加chart-loaded类隐藏加载提示
     8. 图表加载失败时添加chart-error类并显示错误信息
+  - **重要**：严禁使用chart.on('finished', ...)或类似的事件监听器来隐藏加载提示，必须使用setTimeout延迟添加chart-loaded类
+  - **JavaScript代码结构要求**：
+    ```javascript
+    document.addEventListener('DOMContentLoaded', function() \{
+      \/* 主题切换逻辑 *\/
+      \/* 数字动画逻辑 *\/
+      \/* ECharts图表初始化逻辑 *\/
+      \/* 所有其他JavaScript代码 *\/
+    \});
+    ```
+    严禁在DOMContentLoaded监听器内部再创建新的DOMContentLoaded监听器
+  - **图表状态管理要求**：
+    - 图表初始化完成后，必须使用setTimeout延迟100毫秒添加chart-loaded类
+    - 严禁使用ECharts的事件监听器（如chart.on('finished', ...)）来管理图表状态
+    - 示例代码：
+    ```javascript
+    // 正确的做法
+    setTimeout(() => \{
+      document.getElementById('chart-id').classList.add('chart-loaded');
+    \}, 100);
+    
+    // 错误的做法 - 严禁使用
+    chart.on('finished', () => \{
+      document.getElementById('chart-id').classList.add('chart-loaded');
+    \});
+    ```
   - **CDN地址**：使用https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.min.js作为ECharts库的CDN地址
   - 数据准确性： 报告中的所有数据和结论都应基于<任务内容>提供的信息，不要产生幻觉，也不要出现没有提供的数据内容，避免误导性信息。
   - 完整性： HTML 页面应包含<任务内容>中所有重要的内容信息。
