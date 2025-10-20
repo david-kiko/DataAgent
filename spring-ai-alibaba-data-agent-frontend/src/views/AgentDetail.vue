@@ -1174,6 +1174,18 @@
                 placeholder="请输入业务知识描述"
                 required
               ></textarea>
+              <div class="ai-generate-container">
+                <button 
+                  type="button" 
+                  class="btn btn-secondary btn-sm ai-generate-btn"
+                  @click="aiGenerateDescription"
+                  :disabled="aiGenerateLoading"
+                >
+                  <i v-if="aiGenerateLoading" class="bi bi-arrow-clockwise spin"></i>
+                  <i v-else class="bi bi-magic"></i>
+                  {{ aiGenerateLoading ? '生成中...' : 'AI生成' }}
+                </button>
+              </div>
             </div>
             <div class="form-group">
               <label>同义词</label>
@@ -1209,6 +1221,35 @@
           <button type="button" class="btn btn-primary" @click="saveBusinessKnowledge">
             {{ isEditingBusinessKnowledge ? '更新' : '创建' }}
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI生成描述确认弹窗 -->
+    <div v-if="showAiGenerateModal" class="modal-overlay" @click="closeAiGenerateModal">
+      <div class="modal-dialog ai-generate-modal" @click.stop>
+        <div class="modal-header">
+          <h3>AI生成描述确认</h3>
+          <button class="close-btn" @click="closeAiGenerateModal">
+            <i class="bi bi-x"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="ai-generate-preview">
+            <h4>生成的描述：</h4>
+            <div class="generated-content">
+              <textarea 
+                v-model="aiGeneratedDescription" 
+                class="form-control" 
+                rows="8"
+                placeholder="AI生成的描述内容"
+              ></textarea>
+            </div>
+            <div class="ai-generate-actions">
+              <button type="button" class="btn btn-secondary" @click="closeAiGenerateModal">取消</button>
+              <button type="button" class="btn btn-primary" @click="confirmAiGenerate">确认使用</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1456,6 +1497,7 @@ export default {
     const showPublishModal = ref(false)
     const showPublishDropdown = ref(false)
     const showAPIModal = ref(false)
+    const showAiGenerateModal = ref(false)
     
     // 预设问题相关数据
     const presetQuestions = ref([])
@@ -1470,6 +1512,10 @@ export default {
       datasetId: '',
       defaultRecall: true
     })
+
+    // AI生成相关数据
+    const aiGenerateLoading = ref(false)
+    const aiGeneratedDescription = ref('')
     
     // 语义模型相关数据
     const isEditingModel = ref(false)
@@ -2245,6 +2291,46 @@ export default {
       }
     }
 
+    // AI生成描述相关方法
+    const aiGenerateDescription = async () => {
+      if (!businessKnowledgeForm.description.trim()) {
+        showMessage('请先输入描述内容', 'warning')
+        return
+      }
+
+      aiGenerateLoading.value = true
+      try {
+        const response = await businessKnowledgeApi.aiGenerateDescription({
+          content: businessKnowledgeForm.description,
+          agentId: agent.id,
+          datasetId: businessKnowledgeForm.datasetId
+        })
+        
+        if (response.success) {
+          aiGeneratedDescription.value = response.data
+          showAiGenerateModal.value = true
+        } else {
+          showMessage('AI生成失败：' + (response.message || '未知错误'), 'error')
+        }
+      } catch (error) {
+        console.error('AI生成描述失败:', error)
+        showMessage('AI生成失败：' + (error.message || '未知错误'), 'error')
+      } finally {
+        aiGenerateLoading.value = false
+      }
+    }
+
+    const closeAiGenerateModal = () => {
+      showAiGenerateModal.value = false
+      aiGeneratedDescription.value = ''
+    }
+
+    const confirmAiGenerate = () => {
+      businessKnowledgeForm.description = aiGeneratedDescription.value
+      closeAiGenerateModal()
+      showMessage('描述已更新', 'success')
+    }
+
     // 预设问题相关方法
     const loadPresetQuestions = async () => {
       try {
@@ -2760,10 +2846,14 @@ print(result)`
       showCreateModelModal,
       showUploadModal,
       showAddDatasourceModal,
+      showAiGenerateModal,
       // 业务知识相关
       businessKnowledgeForm,
       isEditingBusinessKnowledge,
       editingBusinessKnowledgeId,
+      // AI生成相关
+      aiGenerateLoading,
+      aiGeneratedDescription,
       // 语义模型相关
       semanticModelForm,
       isEditingModel,
@@ -2806,6 +2896,10 @@ print(result)`
       // 业务知识方法
       saveBusinessKnowledge,
       closeBusinessKnowledgeModal,
+      // AI生成方法
+      aiGenerateDescription,
+      closeAiGenerateModal,
+      confirmAiGenerate,
       // 语义模型方法
       saveModel,
       closeModelModal,
@@ -3753,6 +3847,54 @@ html {
 .business-knowledge-section,
 .semantic-model-section {
   margin-top: 16px;
+}
+
+/* AI生成相关样式 */
+.ai-generate-container {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ai-generate-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+.ai-generate-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.ai-generate-modal {
+  max-width: 600px;
+}
+
+.ai-generate-preview h4 {
+  margin-bottom: 12px;
+  color: #333;
+}
+
+.generated-content {
+  margin-bottom: 16px;
+}
+
+.ai-generate-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .section-header {

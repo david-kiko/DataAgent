@@ -33,6 +33,9 @@ public class AgentKnowledgeService {
 	@Autowired
 	private AgentKnowledgeMapper agentKnowledgeMapper;
 
+	@Autowired
+	private AiGenerateDescriptionService aiGenerateDescriptionService;
+
 	/**
 	 * Query knowledge list by agent ID
 	 */
@@ -148,6 +151,13 @@ public class AgentKnowledgeService {
 	 */
 	public List<Object[]> countKnowledgeByType(Integer agentId) {
 		return agentKnowledgeMapper.countByType(agentId);
+	}
+
+	/**
+	 * AI generate business knowledge description
+	 */
+	public String aiGenerateDescription(String content, Integer agentId, String datasetId) {
+		return aiGenerateDescriptionService.generateDescription(content, agentId, datasetId);
 	}
 
 }

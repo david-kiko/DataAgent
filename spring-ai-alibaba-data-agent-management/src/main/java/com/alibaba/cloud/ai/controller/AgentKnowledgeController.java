@@ -385,4 +385,45 @@ public class AgentKnowledgeController {
 		}
 	}
 
+	/**
+	 * AI generate business knowledge description
+	 */
+	@PostMapping("/ai-generate-description")
+	public ResponseEntity<Map<String, Object>> aiGenerateDescription(@RequestBody Map<String, Object> request) {
+		Map<String, Object> response = new HashMap<>();
+
+		try {
+			String content = (String) request.get("content");
+			Integer agentId = (Integer) request.get("agentId");
+			String datasetId = (String) request.get("datasetId");
+
+			if (content == null || content.trim().isEmpty()) {
+				response.put("success", false);
+				response.put("message", "输入内容不能为空");
+				return ResponseEntity.badRequest().body(response);
+			}
+
+			if (agentId == null) {
+				response.put("success", false);
+				response.put("message", "智能体ID不能为空");
+				return ResponseEntity.badRequest().body(response);
+			}
+
+			// Call AI generation service
+			String generatedDescription = agentKnowledgeService.aiGenerateDescription(content, agentId, datasetId);
+
+			response.put("success", true);
+			response.put("data", generatedDescription);
+			response.put("message", "AI生成描述成功");
+			return ResponseEntity.ok(response);
+
+		}
+		catch (Exception e) {
+			log.error("AI生成描述失败：{}", e.getMessage());
+			response.put("success", false);
+			response.put("message", "AI生成描述失败：" + e.getMessage());
+			return ResponseEntity.badRequest().body(response);
+		}
+	}
+
 }

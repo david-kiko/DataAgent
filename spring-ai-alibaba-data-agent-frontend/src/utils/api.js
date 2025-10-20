@@ -220,6 +220,11 @@ export const businessKnowledgeApi = {
     return post(`/knowledge/agent/${agentId}/addList`, dataList)
   },
 
+  // AI生成业务知识描述
+  aiGenerateDescription(data) {
+    return post('/agent-knowledge/ai-generate-description', data)
+  },
+
   // 获取业务知识详情
   getDetail(id) {
     return get(`/knowledge/${id}`)
