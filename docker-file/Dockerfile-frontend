@@ -23,8 +23,14 @@ COPY spring-ai-alibaba-data-agent-frontend .
 # 安装依赖
 RUN npm install
 
+# 验证依赖是否正确安装
+RUN npm list bootstrap-icons highlight.js
+
 # 构建生产版本
 RUN npm run build
+
+# 验证构建结果中是否包含图标文件
+RUN find /app/dist -name "*.css" -exec grep -l "bootstrap-icons" {} \;
 
 
 # 运行阶段

@@ -20,6 +20,10 @@ import App from './App.vue'
 // 引入全局样式
 import './styles/global.css'
 
+// 引入图标库和代码高亮样式
+import 'bootstrap-icons/font/bootstrap-icons.css'
+import 'highlight.js/styles/atom-one-dark.min.css'
+
 // 引入页面组件
 import Home from './views/Home.vue'
 import HomeSimple from './views/HomeSimple.vue'

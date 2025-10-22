@@ -72,6 +72,13 @@
               <i class="bi bi-eye"></i>
             </button>
             <button 
+              class="action-btn download-btn" 
+              @click="downloadFile(file)"
+              title="下载"
+            >
+              <i class="bi bi-download"></i>
+            </button>
+            <button 
               class="action-btn delete-btn" 
               @click="removeFile(index)"
               title="删除"
@@ -94,7 +101,7 @@
 </template>
 
 <script>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 
 export default {
   name: 'FileUpload',
@@ -122,6 +129,9 @@ export default {
   },
   emits: ['files-uploaded', 'files-removed'],
   setup(props, { emit }) {
+    console.log('=== FileUpload组件初始化 ===')
+    console.log('props:', props)
+    
     const fileInput = ref(null)
     const uploadedFiles = ref([])
     const isDragOver = ref(false)
@@ -173,6 +183,10 @@ export default {
     }
     
     const handleFiles = async (files) => {
+      console.log('=== 文件选择调试 ===')
+      console.log('选择的文件数量:', files.length)
+      console.log('文件列表:', files)
+      
       if (files.length === 0) return
       
       // 验证文件
@@ -213,10 +227,17 @@ export default {
           const result = await response.json()
           
           if (result.success) {
-            uploadedFiles.value.push({
+            console.log('后端返回的数据:', result.data)
+            const fileData = {
               ...result.data,
-              status: 'ACTIVE'
-            })
+              status: 'ACTIVE',
+              // 确保文件大小正确显示
+              fileSize: result.data.fileSize || file.size,
+              originalFilename: result.data.originalFilename || file.name,
+              fileType: result.data.fileType || getFileExtension(file.name)
+            }
+            console.log('处理后的文件数据:', fileData)
+            uploadedFiles.value.push(fileData)
           } else {
             console.error('文件上传失败:', result.message)
             alert(`文件 ${file.name} 上传失败：${result.message}`)
@@ -225,7 +246,11 @@ export default {
           uploadProgress.value = Math.round(((validFiles.indexOf(file) + 1) / validFiles.length) * 100)
         }
         
+        console.log('=== FileUpload组件调试 ===')
+        console.log('准备触发files-uploaded事件')
+        console.log('uploadedFiles.value:', uploadedFiles.value)
         emit('files-uploaded', uploadedFiles.value)
+        console.log('files-uploaded事件已触发')
         
       } catch (error) {
         console.error('文件上传失败:', error)
@@ -238,17 +263,28 @@ export default {
     
     const removeFile = async (index) => {
       const file = uploadedFiles.value[index]
+      console.log('准备删除文件:', file)
+      console.log('文件ID:', file.id)
+      
+      if (!file.id) {
+        alert('文件ID不存在，无法删除')
+        return
+      }
       
       try {
+        console.log('发送删除请求到:', `/api/csv/${file.id}`)
         const response = await fetch(`/api/csv/${file.id}`, {
           method: 'DELETE'
         })
         
+        console.log('删除响应状态:', response.status)
         const result = await response.json()
+        console.log('删除响应数据:', result)
         
         if (result.success) {
           uploadedFiles.value.splice(index, 1)
           emit('files-removed', uploadedFiles.value)
+          console.log('文件删除成功，更新文件列表')
         } else {
           alert('删除文件失败：' + result.message)
         }
@@ -274,11 +310,233 @@ export default {
     }
     
     const previewFile = (file) => {
-      // TODO: 实现文件预览功能
       console.log('预览文件:', file)
+      
+      // 检查文件类型，支持CSV和Excel文件预览
+      const fileType = file.fileType?.toLowerCase() || getFileExtension(file.originalFilename)?.toLowerCase()
+      
+      if (fileType === 'csv') {
+        // 对于CSV文件，显示表格预览
+        if (file.id) {
+          showCsvPreview(file)
+        } else {
+          alert('文件ID不存在，无法预览')
+        }
+      } else if (fileType === 'xlsx' || fileType === 'xls') {
+        // 对于Excel文件，使用下载接口
+        if (file.id) {
+          const downloadUrl = `/api/csv/${file.id}/download`
+          console.log('下载Excel文件:', downloadUrl)
+          window.open(downloadUrl, '_blank')
+        } else {
+          alert('文件ID不存在，无法下载')
+        }
+      } else {
+        alert('暂不支持此文件类型的预览')
+      }
+    }
+    
+    const showCsvPreview = async (file) => {
+      try {
+        console.log('获取CSV预览数据:', file.id)
+        const response = await fetch(`/api/csv/${file.id}/preview`)
+        const data = await response.json()
+        
+        if (data.success) {
+          // 显示预览模态框
+          showPreviewModal(data)
+        } else {
+          alert('预览失败：' + data.message)
+        }
+      } catch (error) {
+        console.error('预览CSV文件失败:', error)
+        alert('预览失败：' + error.message)
+      }
+    }
+    
+    const showPreviewModal = (data) => {
+      // 创建预览模态框
+      const modal = document.createElement('div')
+      modal.className = 'csv-preview-modal'
+      modal.innerHTML = `
+        <div class="modal-overlay" onclick="this.parentElement.remove()">
+          <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+              <h3>CSV文件预览 - ${data.filename}</h3>
+              <button class="close-btn" onclick="this.closest('.csv-preview-modal').remove()">&times;</button>
+            </div>
+            <div class="modal-body">
+              <div class="file-info">
+                <p>文件名: ${data.filename}</p>
+                <p>文件大小: ${formatFileSize(data.fileSize)}</p>
+                <p>总行数: ${data.totalRows}</p>
+              </div>
+              <div class="table-container">
+                <table class="csv-table">
+                  <thead>
+                    <tr>
+                      ${Object.keys(data.rows[0] || {}).map(header => `<th>${header}</th>`).join('')}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${data.rows.map(row => `
+                      <tr>
+                        ${Object.values(row).map(cell => `<td>${cell}</td>`).join('')}
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-primary" onclick="window.open('/api/csv/${data.fileId}/download', '_blank')">下载文件</button>
+              <button class="btn btn-secondary" onclick="this.closest('.csv-preview-modal').remove()">关闭</button>
+            </div>
+          </div>
+        </div>
+      `
+      
+      // 添加样式
+      const style = document.createElement('style')
+      style.textContent = `
+        .csv-preview-modal {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          z-index: 1000;
+        }
+        .modal-overlay {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.5);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          padding: 20px;
+        }
+        .modal-content {
+          background: white;
+          border-radius: 8px;
+          max-width: 90%;
+          max-height: 90%;
+          width: 800px;
+          display: flex;
+          flex-direction: column;
+        }
+        .modal-header {
+          padding: 16px 20px;
+          border-bottom: 1px solid #e8e8e8;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .modal-header h3 {
+          margin: 0;
+          font-size: 18px;
+        }
+        .close-btn {
+          background: none;
+          border: none;
+          font-size: 24px;
+          cursor: pointer;
+          color: #999;
+        }
+        .modal-body {
+          flex: 1;
+          overflow: auto;
+          padding: 20px;
+        }
+        .file-info {
+          margin-bottom: 16px;
+          padding: 12px;
+          background: #f5f5f5;
+          border-radius: 4px;
+        }
+        .file-info p {
+          margin: 4px 0;
+          font-size: 14px;
+        }
+        .table-container {
+          overflow: auto;
+          max-height: 400px;
+          border: 1px solid #e8e8e8;
+          border-radius: 4px;
+        }
+        .csv-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 14px;
+        }
+        .csv-table th,
+        .csv-table td {
+          padding: 8px 12px;
+          text-align: left;
+          border-bottom: 1px solid #e8e8e8;
+        }
+        .csv-table th {
+          background: #fafafa;
+          font-weight: 600;
+          position: sticky;
+          top: 0;
+        }
+        .csv-table tr:hover {
+          background: #f5f5f5;
+        }
+        .modal-footer {
+          padding: 16px 20px;
+          border-top: 1px solid #e8e8e8;
+          display: flex;
+          gap: 12px;
+          justify-content: flex-end;
+        }
+        .btn {
+          padding: 8px 16px;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 14px;
+        }
+        .btn-primary {
+          background: #1890ff;
+          color: white;
+        }
+        .btn-secondary {
+          background: #f5f5f5;
+          color: #333;
+        }
+      `
+      
+      document.head.appendChild(style)
+      document.body.appendChild(modal)
+    }
+    
+    const downloadFile = (file) => {
+      console.log('下载文件:', file)
+      
+      if (file.id) {
+        const downloadUrl = `/api/csv/${file.id}/download`
+        console.log('下载文件URL:', downloadUrl)
+        window.open(downloadUrl, '_blank')
+      } else {
+        alert('文件ID不存在，无法下载')
+      }
+    }
+    
+    const getFileExtension = (filename) => {
+      if (!filename) return ''
+      const lastDot = filename.lastIndexOf('.')
+      return lastDot > -1 ? filename.substring(lastDot + 1) : ''
     }
     
     const getFileIcon = (fileType) => {
+      if (!fileType) {
+        return 'bi bi-file-earmark'
+      }
       switch (fileType.toLowerCase()) {
         case 'csv':
           return 'bi bi-filetype-csv'
@@ -311,9 +569,51 @@ export default {
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
     }
     
-    // 监听会话变化，清空文件列表
-    watch(() => props.sessionId, () => {
-      uploadedFiles.value = []
+    // 加载已上传的文件
+    const loadUploadedFiles = async () => {
+      if (!props.sessionId) {
+        console.log('没有sessionId，跳过加载文件')
+        return
+      }
+      
+      try {
+        console.log('加载已上传文件: sessionId=', props.sessionId)
+        const response = await fetch(`/api/csv/session/${props.sessionId}`)
+        const result = await response.json()
+        
+        if (result.success && result.data) {
+          console.log('加载到已上传文件:', result.data)
+          uploadedFiles.value = result.data.map(file => ({
+            ...file,
+            status: 'ACTIVE'
+          }))
+          console.log('已上传文件列表更新:', uploadedFiles.value)
+        } else {
+          console.log('没有找到已上传文件')
+          uploadedFiles.value = []
+        }
+      } catch (error) {
+        console.error('加载已上传文件失败:', error)
+        uploadedFiles.value = []
+      }
+    }
+    
+    // 监听会话变化，重新加载文件列表
+    watch(() => props.sessionId, (newSessionId, oldSessionId) => {
+      console.log('会话ID变化:', oldSessionId, '->', newSessionId)
+      if (newSessionId && newSessionId !== oldSessionId) {
+        loadUploadedFiles()
+      } else if (!newSessionId) {
+        uploadedFiles.value = []
+      }
+    })
+    
+    // 组件挂载时加载已上传文件
+    onMounted(() => {
+      console.log('FileUpload组件挂载，sessionId:', props.sessionId)
+      if (props.sessionId) {
+        loadUploadedFiles()
+      }
     })
     
     return {
@@ -332,6 +632,8 @@ export default {
       removeFile,
       clearAllFiles,
       previewFile,
+      downloadFile,
+      loadUploadedFiles,
       getFileIcon,
       getStatusText,
       formatFileSize

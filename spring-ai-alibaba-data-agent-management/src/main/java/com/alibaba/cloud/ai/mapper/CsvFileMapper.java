@@ -40,3 +40,4 @@ public interface CsvFileMapper {
     @Delete("DELETE FROM csv_files WHERE id = #{id}")
     int deleteById(Long id);
 }
+

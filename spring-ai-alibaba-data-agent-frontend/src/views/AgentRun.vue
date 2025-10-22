@@ -172,6 +172,8 @@
                     <span class="message-role">用户</span>
                     <span class="message-time">{{ formatTime(message.timestamp) }}</span>
                   </div>
+                  
+                  
                   <div class="message-body">
                     <div class="text-message">
                       <div v-html="formatMessage(message.content)"></div>
@@ -3137,13 +3139,14 @@ export default {
     
     // 处理文件上传
     const handleFilesUploaded = (files) => {
+      console.log('=== 文件上传调试 ===')
       console.log('文件上传成功:', files)
-      // 可以在这里添加提示信息
+      console.log('文件将在FileUpload组件中显示，不需要添加到聊天消息')
     }
     
     const handleFilesRemoved = (files) => {
       console.log('文件删除成功:', files)
-      // 可以在这里添加提示信息
+      console.log('文件删除将在FileUpload组件中处理')
     }
     
     // 获取会话的CSV文件列表
@@ -3157,6 +3160,7 @@ export default {
         return []
       }
     }
+    
     
     return {
       // 数据
@@ -5313,5 +5317,6 @@ export default {
 .modal-footer .btn:hover {
   opacity: 0.9;
 }
+
 
 </style>

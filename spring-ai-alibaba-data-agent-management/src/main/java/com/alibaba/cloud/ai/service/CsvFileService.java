@@ -70,14 +70,50 @@ public class CsvFileService {
      * 删除CSV文件
      */
     public void deleteFile(Long fileId) {
-        CsvFile csvFile = csvFileMapper.selectById(fileId);
-        if (csvFile != null) {
+        try {
+            log.info("开始删除CSV文件: fileId={}", fileId);
+            
+            CsvFile csvFile = csvFileMapper.selectById(fileId);
+            if (csvFile == null) {
+                log.warn("CSV文件不存在: fileId={}", fileId);
+                throw new RuntimeException("文件不存在");
+            }
+            
+            log.info("找到CSV文件: fileId={}, filename={}, status={}, filePath={}", 
+                    fileId, csvFile.getOriginalFilename(), csvFile.getStatus(), csvFile.getFilePath());
+            
+            // 先删除S3上的文件
+            try {
+                if (csvFile.getFilePath() != null && !csvFile.getFilePath().isEmpty()) {
+                    log.info("开始删除S3文件: filePath={}", csvFile.getFilePath());
+                    s3FileUploadService.deleteFile(csvFile.getFilePath());
+                    log.info("S3文件删除成功: filePath={}", csvFile.getFilePath());
+                } else {
+                    log.warn("文件路径为空，跳过S3删除: fileId={}", fileId);
+                }
+            } catch (Exception e) {
+                log.error("删除S3文件失败，但继续更新数据库状态: fileId={}, filePath={}, error={}", 
+                        fileId, csvFile.getFilePath(), e.getMessage(), e);
+                // 不抛出异常，继续更新数据库状态
+            }
+            
             // 更新状态为已删除
             csvFile.setStatus("DELETED");
             csvFile.setUpdatedTime(LocalDateTime.now());
-            csvFileMapper.updateStatus(csvFile);
             
-            log.info("CSV文件删除成功: fileId={}", fileId);
+            int updateResult = csvFileMapper.updateStatus(csvFile);
+            log.info("更新文件状态结果: fileId={}, updateResult={}", fileId, updateResult);
+            
+            if (updateResult > 0) {
+                log.info("CSV文件删除成功: fileId={}", fileId);
+            } else {
+                log.warn("CSV文件状态更新失败: fileId={}", fileId);
+                throw new RuntimeException("文件状态更新失败");
+            }
+            
+        } catch (Exception e) {
+            log.error("删除CSV文件失败: fileId={}, error={}", fileId, e.getMessage(), e);
+            throw new RuntimeException("删除文件失败: " + e.getMessage(), e);
         }
     }
     
@@ -88,4 +124,5 @@ public class CsvFileService {
         csvFileMapper.deleteById(fileId);
         log.info("CSV文件物理删除成功: fileId={}", fileId);
     }
+    
 }
