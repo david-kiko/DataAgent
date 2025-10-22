@@ -14,6 +14,9 @@ CREATE TABLE IF NOT EXISTS agent (
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     human_review_enabled TINYINT DEFAULT 0 COMMENT '是否启用计划人工复核：0-否，1-是',
+    csv_upload_enabled TINYINT DEFAULT 0 COMMENT '是否允许上传CSV文件：0-否，1-是',
+    csv_max_file_size BIGINT DEFAULT 10485760 COMMENT 'CSV文件最大大小（字节），默认10MB',
+    csv_allowed_types VARCHAR(255) DEFAULT 'csv,xlsx' COMMENT '允许的文件类型，逗号分隔',
     PRIMARY KEY (id),
     INDEX idx_name (name),
     INDEX idx_status (status),
@@ -225,3 +228,30 @@ CREATE TABLE IF NOT EXISTS table_relation (
   INDEX idx_target_table (target_table),
   INDEX idx_is_active (is_active)
 ) ENGINE = InnoDB COMMENT = '表关联关系表';
+
+-- CSV文件表
+CREATE TABLE IF NOT EXISTS csv_files (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    agent_id INT NOT NULL COMMENT '关联的智能体ID',
+    session_id VARCHAR(100) NOT NULL COMMENT '会话ID',
+    original_filename VARCHAR(255) NOT NULL COMMENT '原始文件名',
+    stored_filename VARCHAR(255) NOT NULL COMMENT '存储文件名',
+    file_path VARCHAR(500) NOT NULL COMMENT '文件存储路径',
+    file_size BIGINT NOT NULL COMMENT '文件大小（字节）',
+    file_type VARCHAR(50) NOT NULL COMMENT '文件类型',
+    upload_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
+    status VARCHAR(20) DEFAULT 'ACTIVE' COMMENT '文件状态：ACTIVE-有效，DELETED-已删除',
+    schema_info TEXT COMMENT 'CSV文件结构信息（JSON格式）',
+    created_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    INDEX idx_agent_id (agent_id),
+    INDEX idx_session_id (session_id),
+    INDEX idx_status (status),
+    INDEX idx_upload_time (upload_time),
+    FOREIGN KEY (agent_id) REFERENCES agent(id) ON DELETE CASCADE
+) ENGINE = InnoDB COMMENT = 'CSV文件表';
+
+-- 注意：CSV分析结果直接存储在chat_message表中
+-- 使用message_type='csv_analysis'来标识CSV分析结果
+-- 使用metadata字段存储CSV文件ID、执行时间等元数据

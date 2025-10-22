@@ -219,6 +219,19 @@
 
         <!-- 输入区域 -->
         <div class="input-container">
+          <!-- CSV文件上传区域 -->
+          <div v-if="agent.csvUploadEnabled" class="csv-upload-section">
+            <FileUpload
+              :agent-id="agent.id"
+              :session-id="currentSessionId"
+              :max-file-size="agent.csvMaxFileSize"
+              :allowed-types="agent.csvAllowedTypes"
+              :disabled="isLoading"
+              @files-uploaded="handleFilesUploaded"
+              @files-removed="handleFilesRemoved"
+            />
+          </div>
+          
           <div class="input-wrapper">
             <div class="input-field">
               <textarea
@@ -312,6 +325,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { presetQuestionApi } from '../utils/api.js'
+import FileUpload from '../components/FileUpload.vue'
 
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github.css';
@@ -327,6 +341,9 @@ hljs.registerLanguage('json', json);
 
 export default {
   name: 'AgentRun',
+  components: {
+    FileUpload
+  },
   setup() {
     const route = useRoute()
     const router = useRouter()
@@ -381,6 +398,9 @@ export default {
           const data = await response.json()
           agent.value.name = data.name || 'NL2SQL 智能助手'
           agent.value.description = data.description || '自然语言转SQL查询助手，帮助您快速生成和执行数据库查询'
+          agent.value.csvUploadEnabled = data.csvUploadEnabled || false
+          agent.value.csvMaxFileSize = data.csvMaxFileSize || 10485760
+          agent.value.csvAllowedTypes = data.csvAllowedTypes || 'csv,xlsx'
           if (typeof data.humanReviewEnabled !== 'undefined') {
             humanReviewEnabled.value = !!data.humanReviewEnabled
           }
@@ -388,11 +408,17 @@ export default {
           // 使用默认值
           agent.value.name = 'NL2SQL 智能助手'
           agent.value.description = '自然语言转SQL查询助手，帮助您快速生成和执行数据库查询'
+          agent.value.csvUploadEnabled = false
+          agent.value.csvMaxFileSize = 10485760
+          agent.value.csvAllowedTypes = 'csv,xlsx'
         }
       } catch (error) {
         console.error('加载智能体信息失败:', error)
         agent.value.name = 'NL2SQL 智能助手'
         agent.value.description = '自然语言转SQL查询助手，帮助您快速生成和执行数据库查询'
+        agent.value.csvUploadEnabled = false
+        agent.value.csvMaxFileSize = 10485760
+        agent.value.csvAllowedTypes = 'csv,xlsx'
       }
     }
 
@@ -804,10 +830,28 @@ export default {
       isLoading.value = true
       
       try {
+        // 获取当前会话的CSV文件信息
+        const csvFiles = await getSessionCsvFiles(currentSessionId.value)
+        
+        // 构建包含CSV文件信息的查询参数
+        const queryParams = new URLSearchParams({
+          query: message,
+          agentId: agent.value.id,
+          threadId: currentThreadId.value
+        })
+        
+        // 如果有CSV文件，添加文件信息到查询参数
+        if (csvFiles.length > 0) {
+          queryParams.append('csvFiles', JSON.stringify(csvFiles.map(file => ({
+            id: file.id,
+            filename: file.originalFilename,
+            filePath: file.filePath,
+            fileType: file.fileType
+          }))))
+        }
+        
         // 启动流式处理
-        // 生成线程ID
-        currentThreadId.value = Date.now().toString()
-        const eventSource = new EventSource(`/nl2sql/stream/search?query=${encodeURIComponent(message)}&agentId=${agent.value.id}&threadId=${currentThreadId.value}`)
+        const eventSource = new EventSource(`/nl2sql/stream/search?${queryParams.toString()}`)
 
         displayEventSourceMessage(eventSource);
       } catch (error) {
@@ -3091,6 +3135,29 @@ export default {
       }
     }
     
+    // 处理文件上传
+    const handleFilesUploaded = (files) => {
+      console.log('文件上传成功:', files)
+      // 可以在这里添加提示信息
+    }
+    
+    const handleFilesRemoved = (files) => {
+      console.log('文件删除成功:', files)
+      // 可以在这里添加提示信息
+    }
+    
+    // 获取会话的CSV文件列表
+    const getSessionCsvFiles = async (sessionId) => {
+      try {
+        const response = await fetch(`/api/csv/session/${sessionId}`)
+        const result = await response.json()
+        return result.success ? result.data : []
+      } catch (error) {
+        console.error('获取CSV文件列表失败:', error)
+        return []
+      }
+    }
+    
     return {
       // 数据
       agent,
@@ -3122,6 +3189,9 @@ export default {
       // 方法
       goBack,
       startNewChat,
+      handleFilesUploaded,
+      handleFilesRemoved,
+      getSessionCsvFiles,
       clearHistory,
       sendMessage,
       sendQuickMessage,
@@ -4879,8 +4949,14 @@ export default {
   padding: var(--space-lg) var(--space-xl);
   background: var(--bg-primary);
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
   position: relative;
+}
+
+/* CSV上传区域样式 */
+.csv-upload-section {
+  margin-bottom: 8px;
 }
 
 .input-wrapper {
@@ -5137,6 +5213,15 @@ export default {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* CSV上传区域样式 */
+.csv-upload-section {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px dashed #dee2e6;
 }
 
 /* 人工复核模态框样式 */

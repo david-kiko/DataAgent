@@ -1,0 +1,91 @@
+package com.alibaba.cloud.ai.service;
+
+import com.alibaba.cloud.ai.entity.CsvFile;
+import com.alibaba.cloud.ai.mapper.CsvFileMapper;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * CSV文件服务
+ */
+@Slf4j
+@Service
+public class CsvFileService {
+    
+    @Autowired
+    private CsvFileMapper csvFileMapper;
+    
+    @Autowired
+    private S3FileUploadService s3FileUploadService;
+    
+    /**
+     * 上传CSV文件
+     */
+    public CsvFile uploadFile(MultipartFile file, Integer agentId, String sessionId) throws IOException {
+        // 上传到S3
+        CsvFile csvFile = s3FileUploadService.uploadFile(
+                file.getInputStream(), 
+                file.getOriginalFilename(), 
+                sessionId, 
+                agentId
+        );
+        
+        // 保存到数据库
+        csvFileMapper.insert(csvFile);
+        
+        log.info("CSV文件上传成功: agentId={}, sessionId={}, filename={}", 
+                agentId, sessionId, file.getOriginalFilename());
+        
+        return csvFile;
+    }
+    
+    /**
+     * 根据会话ID获取CSV文件列表
+     */
+    public List<CsvFile> getBySessionId(String sessionId) {
+        return csvFileMapper.selectBySessionId(sessionId);
+    }
+    
+    /**
+     * 根据智能体和会话ID获取CSV文件列表
+     */
+    public List<CsvFile> getByAgentAndSession(Integer agentId, String sessionId) {
+        return csvFileMapper.selectByAgentAndSession(agentId, sessionId);
+    }
+    
+    /**
+     * 根据ID获取CSV文件
+     */
+    public CsvFile getById(Long id) {
+        return csvFileMapper.selectById(id);
+    }
+    
+    /**
+     * 删除CSV文件
+     */
+    public void deleteFile(Long fileId) {
+        CsvFile csvFile = csvFileMapper.selectById(fileId);
+        if (csvFile != null) {
+            // 更新状态为已删除
+            csvFile.setStatus("DELETED");
+            csvFile.setUpdatedTime(LocalDateTime.now());
+            csvFileMapper.updateStatus(csvFile);
+            
+            log.info("CSV文件删除成功: fileId={}", fileId);
+        }
+    }
+    
+    /**
+     * 物理删除CSV文件
+     */
+    public void physicalDeleteFile(Long fileId) {
+        csvFileMapper.deleteById(fileId);
+        log.info("CSV文件物理删除成功: fileId={}", fileId);
+    }
+}

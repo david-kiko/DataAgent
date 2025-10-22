@@ -59,4 +59,14 @@ public class Agent {
 	@Builder.Default
 	private Integer humanReviewEnabled = 0; // 0/1 for JDBC compatibility
 
+	// CSV upload configuration
+	@Builder.Default
+	private Integer csvUploadEnabled = 0; // 0/1 for JDBC compatibility
+
+	@Builder.Default
+	private Long csvMaxFileSize = 10L * 1024 * 1024; // Default 10MB
+
+	@Builder.Default
+	private String csvAllowedTypes = "csv,xlsx"; // Allowed file types
+
 }

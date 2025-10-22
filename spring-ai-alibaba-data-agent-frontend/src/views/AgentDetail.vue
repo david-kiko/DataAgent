@@ -286,6 +286,48 @@
                   </div>
                   <small class="form-text">开启后，Planner 计划会在执行前等待人工复核</small>
                 </div>
+
+                <!-- CSV上传配置 -->
+                <div class="form-group">
+                  <div class="checkbox-group">
+                    <input
+                        type="checkbox"
+                        id="csvUploadCheckBox"
+                        v-model="agent.csvUploadEnabled"
+                        class="form-checkbox"
+                    >
+                    <label class="checkbox-label" for="csvUploadCheckBox">允许上传CSV文件</label>
+                  </div>
+                  <small class="form-text">开启后，用户可以在对话中上传CSV文件进行分析</small>
+                </div>
+
+                <!-- CSV配置详情 -->
+                <div v-if="agent.csvUploadEnabled" class="csv-config-details">
+                  <div class="form-group">
+                    <label for="csvMaxFileSize">最大文件大小 (MB)</label>
+                    <input 
+                        type="number"
+                        id="csvMaxFileSize"
+                        v-model="csvMaxFileSizeMB"
+                        min="1"
+                        max="100"
+                        class="form-control"
+                    >
+                    <small class="form-text">设置允许上传的CSV文件最大大小</small>
+                  </div>
+                  
+                  <div class="form-group">
+                    <label for="csvAllowedTypes">允许的文件类型</label>
+                    <input 
+                        type="text"
+                        id="csvAllowedTypes"
+                        v-model="agent.csvAllowedTypes"
+                        placeholder="csv,xlsx,xls"
+                        class="form-control"
+                    >
+                    <small class="form-text">用逗号分隔，如：csv,xlsx,xls</small>
+                  </div>
+                </div>
                 <div class="form-actions">
                   <button class="btn btn-primary" @click="updateAgent">保存</button>
                 </div>
@@ -1475,7 +1517,10 @@ export default {
       category: '',
       adminId: '',
       tags: '',
-      humanReviewEnabled: false
+      humanReviewEnabled: false,
+      csvUploadEnabled: false,
+      csvMaxFileSize: 10485760, // 10MB in bytes
+      csvAllowedTypes: 'csv,xlsx'
     })
     
     // 消息提示
@@ -1489,6 +1534,14 @@ export default {
     const semanticModelList = ref([])
     const knowledgeDocuments = ref([])
     const datasourceList = ref([])
+    
+    // CSV配置相关
+    const csvMaxFileSizeMB = computed({
+      get: () => Math.round(agent.csvMaxFileSize / (1024 * 1024)),
+      set: (value) => {
+        agent.csvMaxFileSize = value * 1024 * 1024
+      }
+    })
     
     const showCreateKnowledgeModal = ref(false)
     const showCreateModelModal = ref(false)
@@ -1625,7 +1678,10 @@ export default {
           prompt: agent.prompt,
           category: agent.category,
           tags: agent.tags,
-          humanReviewEnabled: agent.humanReviewEnabled ? 1 : 0
+          humanReviewEnabled: agent.humanReviewEnabled ? 1 : 0,
+          csvUploadEnabled: agent.csvUploadEnabled ? 1 : 0,
+          csvMaxFileSize: agent.csvMaxFileSize,
+          csvAllowedTypes: agent.csvAllowedTypes
         })
         showMessage('更新成功', 'success')
       } catch (error) {
@@ -1651,7 +1707,10 @@ export default {
           category: response.category || '',
           adminId: response.adminId || '',
           tags: response.tags || '',
-          humanReviewEnabled: (response.humanReviewEnabled ?? 0) === 1
+          humanReviewEnabled: (response.humanReviewEnabled ?? 0) === 1,
+          csvUploadEnabled: (response.csvUploadEnabled ?? 0) === 1,
+          csvMaxFileSize: response.csvMaxFileSize || 10485760,
+          csvAllowedTypes: response.csvAllowedTypes || 'csv,xlsx'
         })
         console.log('智能体详情加载成功:', agent)
       } catch (error) {
@@ -2838,6 +2897,7 @@ print(result)`
       activeTab,
       agent,
       message,
+      csvMaxFileSizeMB,
       businessKnowledgeList,
       semanticModelList,
       knowledgeDocuments,

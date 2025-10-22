@@ -1,6 +1,11 @@
 server:
   port: 8065
 spring:
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+      enabled: true
   datasource:
     url: ${NL2SQL_DATASOURCE_URL:jdbc:mysql://127.0.0.1:3306/nl2sql_db?useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&transformedBitIsBoolean=true&allowMultiQueries=true&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Shanghai}
     username: ${NL2SQL_DATASOURCE_USERNAME:root}
@@ -69,11 +74,14 @@ spring:
             path: ./uploads
             url-prefix: /uploads
             imageSize: 2097152
-  servlet:
-    multipart:
-      max-file-size: 10MB
-      max-request-size: 10MB
-      enabled: true
+
+# S3存储配置
+s3:
+  endpoint: ${S3_ENDPOINT:http://192.168.30.132:9010}
+  access-key: ${S3_ACCESS_KEY:1tdvQZ5Er0CUSckmLs17}
+  secret-key: ${S3_SECRET_KEY:Eq5VQMgp9WCXb7NamK4yhcUGYdk6nw8esJZBf2v0}
+  bucket-name: ${S3_BUCKET_NAME:dataagent}
+  region: ${S3_REGION:us-east-1}  # rustfs等S3兼容存储需要设置region
 
 mybatis:
   configuration:

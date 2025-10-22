@@ -52,8 +52,8 @@ public interface AgentMapper {
 	List<Agent> searchByKeyword(@Param("keyword") String keyword);
 
 	@Insert("""
-			INSERT INTO agent (name, description, avatar, status, prompt, category, admin_id, tags, create_time, update_time, human_review_enabled)
-			VALUES (#{name}, #{description}, #{avatar}, #{status}, #{prompt}, #{category}, #{adminId}, #{tags}, #{createTime}, #{updateTime}, #{humanReviewEnabled})
+			INSERT INTO agent (name, description, avatar, status, prompt, category, admin_id, tags, create_time, update_time, human_review_enabled, csv_upload_enabled, csv_max_file_size, csv_allowed_types)
+			VALUES (#{name}, #{description}, #{avatar}, #{status}, #{prompt}, #{category}, #{adminId}, #{tags}, #{createTime}, #{updateTime}, #{humanReviewEnabled}, #{csvUploadEnabled}, #{csvMaxFileSize}, #{csvAllowedTypes})
 			""")
 	@Options(useGeneratedKeys = true, keyProperty = "id", keyColumn = "id")
 	int insert(Agent agent);
@@ -69,7 +69,10 @@ public interface AgentMapper {
 				admin_id = #{adminId},
 				tags = #{tags},
 				update_time = #{updateTime},
-				human_review_enabled = #{humanReviewEnabled}
+				human_review_enabled = #{humanReviewEnabled},
+				csv_upload_enabled = #{csvUploadEnabled},
+				csv_max_file_size = #{csvMaxFileSize},
+				csv_allowed_types = #{csvAllowedTypes}
 			WHERE id = #{id}
 			""")
 	int updateById(Agent agent);
