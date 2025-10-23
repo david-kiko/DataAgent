@@ -98,4 +98,16 @@ public class PromptConstant {
 		return new PromptTemplate(PromptLoader.loadPrompt("time-conversion"));
 	}
 
+	public static PromptTemplate getCsvPlannerPromptTemplate() {
+		return new PromptTemplate(PromptLoader.loadPrompt("csv-planner"));
+	}
+
+	public static PromptTemplate getUnifiedPlannerPromptTemplate() {
+		return new PromptTemplate(PromptLoader.loadPrompt("unified-planner"));
+	}
+
+	public static PromptTemplate getCsvAnalysisPromptTemplate() {
+		return new PromptTemplate(PromptLoader.loadPrompt("csv-analysis"));
+	}
+
 }

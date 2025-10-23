@@ -30,14 +30,19 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
 import reactor.core.publisher.Flux;
 
+import java.util.List;
 import java.util.Map;
 
 import static com.alibaba.cloud.ai.constant.Constant.BUSINESS_KNOWLEDGE;
+import static com.alibaba.cloud.ai.constant.Constant.CSV_COLUMN_DOCUMENTS_OUTPUT;
+import static com.alibaba.cloud.ai.constant.Constant.CSV_FILE_DOCUMENTS_OUTPUT;
+import static com.alibaba.cloud.ai.constant.Constant.CSV_SCHEMAS;
 import static com.alibaba.cloud.ai.constant.Constant.INPUT_KEY;
 import static com.alibaba.cloud.ai.constant.Constant.IS_ONLY_NL2SQL;
 import static com.alibaba.cloud.ai.constant.Constant.PLANNER_NODE_OUTPUT;
 import static com.alibaba.cloud.ai.constant.Constant.PLAN_VALIDATION_ERROR;
 import static com.alibaba.cloud.ai.constant.Constant.QUERY_REWRITE_NODE_OUTPUT;
+import static com.alibaba.cloud.ai.constant.Constant.SCHEMA_RECALL_NODE_OUTPUT;
 import static com.alibaba.cloud.ai.constant.Constant.SEMANTIC_MODEL;
 import static com.alibaba.cloud.ai.constant.Constant.TABLE_RELATION_OUTPUT;
 
@@ -61,6 +66,112 @@ public class PlannerNode implements NodeAction {
 		String processedQuery = StateUtils.getStringValue(state, QUERY_REWRITE_NODE_OUTPUT, input);
 		logger.info("Using processed query for planning: {}", processedQuery);
 
+		// 获取所有可用的schema信息，让LLM自动判断执行策略
+		String databaseSchemas = StateUtils.getStringValue(state, SCHEMA_RECALL_NODE_OUTPUT, "");
+		String csvSchemas = StateUtils.getStringValue(state, CSV_SCHEMAS, "");
+		String businessKnowledge = StateUtils.getStringValue(state, BUSINESS_KNOWLEDGE, "");
+		
+		// 获取CSV召回的信息
+		@SuppressWarnings("unchecked")
+		List<Object> csvFileDocuments = (List<Object>) state.value(CSV_FILE_DOCUMENTS_OUTPUT).orElse(new java.util.ArrayList<>());
+		@SuppressWarnings("unchecked")
+		List<List<Object>> csvColumnDocuments = (List<List<Object>>) state.value(CSV_COLUMN_DOCUMENTS_OUTPUT).orElse(new java.util.ArrayList<>());
+		
+		logger.info("Available schemas - Database: {}, CSV: {}, Business: {}, CSV Files: {}, CSV Columns: {}", 
+			databaseSchemas.length() > 0, csvSchemas.length() > 0, businessKnowledge.length() > 0,
+			csvFileDocuments.size(), csvColumnDocuments.size());
+
+		// 统一生成计划，让LLM根据所有可用信息自动判断执行策略
+		return generateUnifiedPlan(state, processedQuery, databaseSchemas, csvSchemas, businessKnowledge, csvFileDocuments, csvColumnDocuments);
+	}
+
+	/**
+	 * 统一生成计划 - 让LLM根据所有可用信息自动判断执行策略
+	 */
+	private Map<String, Object> generateUnifiedPlan(OverAllState state, String processedQuery, 
+			String databaseSchemas, String csvSchemas, String businessKnowledge, 
+			List<Object> csvFileDocuments, List<List<Object>> csvColumnDocuments) throws Exception {
+		logger.info("Generating unified plan with all available schemas");
+
+		// 检查是否为修复模式
+		String validationError = StateUtils.getStringValue(state, PLAN_VALIDATION_ERROR, null);
+		if (validationError != null) {
+			logger.info("Regenerating plan with user feedback: {}", validationError);
+		}
+
+		// 构建用户提示
+		String userPrompt = buildUserPrompt(processedQuery, validationError, state);
+
+		// 构建统一的计划生成参数
+		Map<String, Object> params = new java.util.HashMap<>();
+		params.put("user_question", userPrompt);
+		params.put("database_schemas", databaseSchemas);
+		params.put("csv_schemas", csvSchemas);
+		params.put("business_knowledge", businessKnowledge);
+		params.put("csv_file_documents", csvFileDocuments);
+		params.put("csv_column_documents", csvColumnDocuments);
+		params.put("plan_validation_error", formatValidationError(validationError));
+
+		// 生成统一计划
+		String plannerPrompt = PromptConstant.getUnifiedPlannerPromptTemplate().render(params);
+		logger.info("Unified Planner prompt: {}", plannerPrompt);
+
+		Flux<ChatResponse> chatResponseFlux = chatClient.prompt().user(plannerPrompt).stream().chatResponse();
+		var generator = StreamingChatGeneratorUtil.createStreamingGeneratorWithMessages(this.getClass(), state,
+				v -> {
+					Map<String, Object> result = new java.util.HashMap<>();
+					result.put(PLANNER_NODE_OUTPUT, v);
+					return result;
+				}, chatResponseFlux, StreamResponseType.PLAN_GENERATION);
+
+		Map<String, Object> result = new java.util.HashMap<>();
+		result.put(PLANNER_NODE_OUTPUT, generator);
+		return result;
+	}
+
+	/**
+	 * 生成CSV分析计划（保留作为备用）
+	 */
+	private Map<String, Object> generateCsvPlan(OverAllState state, String processedQuery) throws Exception {
+		logger.info("Generating CSV analysis plan");
+
+		// 检查是否为修复模式
+		String validationError = StateUtils.getStringValue(state, PLAN_VALIDATION_ERROR, null);
+		if (validationError != null) {
+			logger.info("Regenerating CSV plan with user feedback: {}", validationError);
+		}
+
+		// 构建用户提示
+		String userPrompt = buildUserPrompt(processedQuery, validationError, state);
+
+		// 构建CSV计划模板参数
+		Map<String, Object> params = new java.util.HashMap<>();
+		params.put("user_question", userPrompt);
+		params.put("plan_validation_error", formatValidationError(validationError));
+
+		// 生成CSV分析计划
+		String plannerPrompt = PromptConstant.getCsvPlannerPromptTemplate().render(params);
+		logger.info("CSV Planner prompt: {}", plannerPrompt);
+
+		Flux<ChatResponse> chatResponseFlux = chatClient.prompt().user(plannerPrompt).stream().chatResponse();
+		var generator = StreamingChatGeneratorUtil.createStreamingGeneratorWithMessages(this.getClass(), state,
+				v -> {
+					Map<String, Object> result = new java.util.HashMap<>();
+					result.put(PLANNER_NODE_OUTPUT, v);
+					return result;
+				}, chatResponseFlux, StreamResponseType.PLAN_GENERATION);
+
+		Map<String, Object> result = new java.util.HashMap<>();
+		result.put(PLANNER_NODE_OUTPUT, generator);
+		return result;
+	}
+
+	/**
+	 * 生成数据库分析计划（原有逻辑）
+	 */
+	private Map<String, Object> generateDatabasePlan(OverAllState state, String processedQuery) throws Exception {
+		logger.info("Generating database analysis plan");
+
 		// 是否为NL2SQL模式
 		Boolean onlyNl2sql = state.value(IS_ONLY_NL2SQL, false);
 
@@ -83,9 +194,12 @@ public class PlannerNode implements NodeAction {
 		String userPrompt = buildUserPrompt(processedQuery, validationError, state);
 
 		// 构建模板参数
-		Map<String, Object> params = Map.of("user_question", userPrompt, "schema", schemaStr, "business_knowledge",
-				businessKnowledge, "semantic_model", semanticModel, "plan_validation_error",
-				formatValidationError(validationError));
+		Map<String, Object> params = new java.util.HashMap<>();
+		params.put("user_question", userPrompt);
+		params.put("schema", schemaStr);
+		params.put("business_knowledge", businessKnowledge);
+		params.put("semantic_model", semanticModel);
+		params.put("plan_validation_error", formatValidationError(validationError));
 
 		// 生成计划
 		String plannerPrompt = (onlyNl2sql ? PromptConstant.getPlannerNl2sqlOnlyTemplate()
@@ -93,12 +207,26 @@ public class PlannerNode implements NodeAction {
 			.render(params);
 		logger.info("Planner prompt ({}): {}", onlyNl2sql ? "NL2SQL_ONLY" : "FULL_ANALYSIS", plannerPrompt);
 
-
 		Flux<ChatResponse> chatResponseFlux = chatClient.prompt().user(plannerPrompt).stream().chatResponse();
 		var generator = StreamingChatGeneratorUtil.createStreamingGeneratorWithMessages(this.getClass(), state,
-				v -> Map.of(PLANNER_NODE_OUTPUT, v), chatResponseFlux, StreamResponseType.PLAN_GENERATION);
+				v -> {
+					Map<String, Object> result = new java.util.HashMap<>();
+					result.put(PLANNER_NODE_OUTPUT, v);
+					return result;
+				}, chatResponseFlux, StreamResponseType.PLAN_GENERATION);
 
-		return Map.of(PLANNER_NODE_OUTPUT, generator);
+		Map<String, Object> result = new java.util.HashMap<>();
+		result.put(PLANNER_NODE_OUTPUT, generator);
+		return result;
+	}
+
+	/**
+	 * 生成混合数据源分析计划
+	 */
+	private Map<String, Object> generateMixedPlan(OverAllState state, String processedQuery) throws Exception {
+		logger.info("Generating mixed data source analysis plan");
+		// 暂时使用数据库计划，后续可以扩展为智能路由
+		return generateDatabasePlan(state, processedQuery);
 	}
 
 	private String buildUserPrompt(String input, String validationError, OverAllState state) {

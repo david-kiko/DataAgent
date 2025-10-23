@@ -20,15 +20,16 @@
 5. **依赖限制**：所有使用的库必须是Python标准库或预安装的第三方库，如`pandas`, `numpy`, `json`, `sys`等。
 6. **动态处理**：禁止硬编码列名/值，所有逻辑基于输入数据动态构建。
 7. **安全限制**：禁止以下操作：
-   - 任何文件/网络操作（open/requests等）。
+   - 任何网络操作（requests等）。
    - 系统调用（os/subprocess）。
-   - 图形/绘图功能。
    - 一些危险的库（pickle）。
+   - **允许**：文件操作（仅限保存图片到指定目录）。
+   - **允许**：图形/绘图功能（matplotlib, seaborn等）。
 8. **性能约束**：单线程执行，最大内存：{python_memory} MB，超时时间：{python_timeout}。
 
 **核心要求**：生成的代码必须满足：
-① 输入SQL结果JSON → ② 执行分析 → ③ 输出JSON结果 的完整闭环。
-④ 异常时通过stderr提供可调试的完整堆栈信息。
+① 输入统一JSON格式数据 → ② 执行分析 → ③ 生成图表并保存 → ④ 输出JSON结果 的完整闭环。
+⑤ 异常时通过stderr提供可调试的完整堆栈信息。
 
 以下是生成代码的模板，请根据具体需求填充逻辑：
 
@@ -37,20 +38,34 @@ import sys
 import json
 import traceback
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os
+from datetime import datetime
+
+# 设置中文字体支持
+plt.rcParams['font.sans-serif'] = ['SimHei', 'Arial Unicode MS']
+plt.rcParams['axes.unicode_minus'] = False
 
 # 错误处理
 try:
-    # 从stdin读取输入数据
+    # 从stdin读取统一格式的输入数据
     input_data = json.load(sys.stdin)
-
+    data = input_data["data"]
+    metadata = input_data["metadata"]
+    
     # 将输入数据转换为DataFrame以便于分析
-    df = pd.DataFrame(input_data)
+    df = pd.DataFrame(data)
 
+    # 创建图片保存目录
+    chart_dir = "/tmp/charts"
+    os.makedirs(chart_dir, exist_ok=True)
+    
     # 动态分析逻辑
-    # 示例：计算某些统计指标
     result = \{
         "summary": \{\},
-        "details": []
+        "details": [],
+        "charts": []
     \}
 
     # 示例逻辑：计算每列的平均值（可根据需求调整）
@@ -66,6 +81,19 @@ try:
     grouped = df.groupby(list(df.columns[:2])).size().reset_index(name="count")
     result["details"] = grouped.to_dict(orient="records")
 
+    # 生成图表示例
+    if len(df.columns) >= 2:
+        # 示例：生成散点图
+        plt.figure(figsize=(10, 6))
+        plt.scatter(df.iloc[:, 0], df.iloc[:, 1])
+        plt.title('数据分布图')
+        plt.xlabel(df.columns[0])
+        plt.ylabel(df.columns[1])
+        chart_path = f"{chart_dir}/scatter_plot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        plt.savefig(chart_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        result["charts"].append(chart_path)
+
     # 时间类型处理示例：如果涉及时间字段，确保转换为字符串
     # for col in df.columns:
     #     if pd.api.types.is_datetime64_any_dtype(df[col]):
@@ -73,7 +101,6 @@ try:
 
     # 输出结果为JSON对象
     print(json.dumps(result, ensure_ascii=False, default=str))
-
 
 except Exception:
     # 捕获异常并输出堆栈信息到stderr
@@ -88,6 +115,8 @@ except Exception:
 1. **输入验证**：确保代码能够正确处理空输入或格式不正确的输入，并在异常时提供清晰的错误信息。**处理的数据必须来自`json.load(sys.stdin)`**。
 2. **性能优化**：尽量减少不必要的计算和内存占用，确保代码在性能约束内高效运行。
 3. **结果完整性**：输出的JSON对象应全面反映分析结果，且字段命名清晰易懂。
+4. **图表生成**：必须生成有意义的图表并保存到`/tmp/charts/`目录，在结果中包含图片路径。
+5. **图片管理**：使用`plt.close()`及时释放内存，避免内存泄漏。
 
 ---
 
@@ -100,17 +129,32 @@ import sys
 import json
 import traceback
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os
+from datetime import datetime
+
+# 设置中文字体支持
+plt.rcParams['font.sans-serif'] = ['SimHei', 'Arial Unicode MS']
+plt.rcParams['axes.unicode_minus'] = False
 
 try:
-    # 从stdin读取输入数据
+    # 从stdin读取统一格式的输入数据
     input_data = json.load(sys.stdin)
-
+    data = input_data["data"]
+    metadata = input_data["metadata"]
+    
     # 转换为DataFrame
-    df = pd.DataFrame(input_data)
+    df = pd.DataFrame(data)
+
+    # 创建图片保存目录
+    chart_dir = "/tmp/charts"
+    os.makedirs(chart_dir, exist_ok=True)
 
     # 动态分析逻辑
     result = \{
-        "channel_stats": []
+        "channel_stats": [],
+        "charts": []
     \}
 
     # 计算每个渠道的线索数量和转化率
@@ -121,6 +165,25 @@ try:
         ).reset_index()
 
         result["channel_stats"] = grouped.to_dict(orient="records")
+        
+        # 生成渠道统计图表
+        plt.figure(figsize=(12, 6))
+        plt.subplot(1, 2, 1)
+        plt.bar(grouped['channel'], grouped['lead_count'])
+        plt.title('各渠道线索数量')
+        plt.xlabel('渠道')
+        plt.ylabel('线索数量')
+        
+        plt.subplot(1, 2, 2)
+        plt.bar(grouped['channel'], grouped['conversion_rate'])
+        plt.title('各渠道转化率')
+        plt.xlabel('渠道')
+        plt.ylabel('转化率')
+        
+        chart_path = f"{chart_dir}/channel_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        plt.savefig(chart_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        result["charts"].append(chart_path)
 
     # 输出结果为JSON对象
     print(json.dumps(result, ensure_ascii=False, default=str))

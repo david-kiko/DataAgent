@@ -182,6 +182,50 @@ public abstract class BaseSchemaService {
 	}
 
 	/**
+	 * Get CSV file documents by query - supports agent isolation
+	 */
+	public List<Document> getCsvFileDocuments(String query, String agentId) {
+		if (agentId != null && !agentId.trim().isEmpty()) {
+			return vectorStoreService.getDocumentsForAgent(agentId, query, "csv_file");
+		}
+		else {
+			return vectorStoreService.getDocuments(query, "csv_file");
+		}
+	}
+
+	/**
+	 * Get CSV file documents for specific agent
+	 */
+	public List<Document> getCsvFileDocumentsForAgent(String agentId, String query) {
+		return vectorStoreService.getDocumentsForAgent(agentId, query, "csv_file");
+	}
+
+	/**
+	 * Get CSV column documents by keywords - supports agent isolation
+	 */
+	public List<List<Document>> getCsvColumnDocumentsByKeywords(List<String> keywords, String agentId) {
+		if (agentId != null && !agentId.trim().isEmpty()) {
+			return keywords.stream()
+				.map(kw -> vectorStoreService.getDocumentsForAgent(agentId, kw, "csv_column"))
+				.collect(Collectors.toList());
+		}
+		else {
+			return keywords.stream()
+				.map(kw -> vectorStoreService.getDocuments(kw, "csv_column"))
+				.collect(Collectors.toList());
+		}
+	}
+
+	/**
+	 * Get CSV column documents by keywords for specific agent
+	 */
+	public List<List<Document>> getCsvColumnDocumentsByKeywordsForAgent(String agentId, List<String> keywords) {
+		return keywords.stream()
+			.map(kw -> vectorStoreService.getDocumentsForAgent(agentId, kw, "csv_column"))
+			.collect(Collectors.toList());
+	}
+
+	/**
 	 * Expand column documents (supplement missing columns through foreign keys)
 	 */
 	private void expandColumnDocumentsWithForeignKeys(Map<String, Document> weightedColumns, Set<String> foreignKeySet,

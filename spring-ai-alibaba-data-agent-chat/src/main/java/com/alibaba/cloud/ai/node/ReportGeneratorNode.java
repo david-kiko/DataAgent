@@ -39,8 +39,10 @@ import java.util.List;
 import java.util.Map;
 
 import static com.alibaba.cloud.ai.constant.Constant.INPUT_KEY;
+import static com.alibaba.cloud.ai.constant.Constant.DATA_SOURCE_TYPE;
 import static com.alibaba.cloud.ai.constant.Constant.PLANNER_NODE_OUTPUT;
 import static com.alibaba.cloud.ai.constant.Constant.PLAN_CURRENT_STEP;
+import static com.alibaba.cloud.ai.constant.Constant.PYTHON_EXECUTE_NODE_OUTPUT;
 import static com.alibaba.cloud.ai.constant.Constant.RESULT;
 import static com.alibaba.cloud.ai.constant.Constant.SQL_EXECUTE_NODE_OUTPUT;
 
@@ -79,9 +81,26 @@ public class ReportGeneratorNode implements NodeAction {
 		String plannerNodeOutput = StateUtils.getStringValue(state, PLANNER_NODE_OUTPUT);
 		String userInput = StateUtils.getStringValue(state, INPUT_KEY);
 		Integer currentStep = StateUtils.getObjectValue(state, PLAN_CURRENT_STEP, Integer.class, 1);
-		@SuppressWarnings("unchecked")
-		HashMap<String, String> executionResults = StateUtils.getObjectValue(state, SQL_EXECUTE_NODE_OUTPUT,
-				HashMap.class, new HashMap<>());
+		
+		// 检查数据源类型，决定使用哪个执行结果
+		String dataSourceType = StateUtils.getStringValue(state, DATA_SOURCE_TYPE, "DATABASE_ONLY");
+		logger.info("ReportGeneratorNode - 数据源类型: {}", dataSourceType);
+		
+		HashMap<String, String> executionResults;
+		if ("CSV_ONLY".equals(dataSourceType)) {
+			// CSV模式：使用Python执行结果
+			String pythonOutput = StateUtils.getStringValue(state, PYTHON_EXECUTE_NODE_OUTPUT);
+			executionResults = new HashMap<>();
+			executionResults.put("python_analysis", pythonOutput);
+			logger.info("使用CSV Python分析结果生成报告");
+		} else {
+			// 数据库模式：使用原有的SQL执行结果
+			@SuppressWarnings("unchecked")
+			HashMap<String, String> sqlResults = StateUtils.getObjectValue(state, SQL_EXECUTE_NODE_OUTPUT,
+					HashMap.class, new HashMap<>());
+			executionResults = sqlResults;
+			logger.info("使用数据库SQL执行结果生成报告");
+		}
 
 		logger.info("Planner node output: {}", plannerNodeOutput);
 

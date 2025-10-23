@@ -38,6 +38,8 @@ import static com.alibaba.cloud.ai.constant.Constant.INPUT_KEY;
 import static com.alibaba.cloud.ai.constant.Constant.KEYWORD_EXTRACT_NODE_OUTPUT;
 import static com.alibaba.cloud.ai.constant.Constant.SCHEMA_RECALL_NODE_OUTPUT;
 import static com.alibaba.cloud.ai.constant.Constant.TABLE_DOCUMENTS_FOR_SCHEMA_OUTPUT;
+import static com.alibaba.cloud.ai.constant.Constant.CSV_FILE_DOCUMENTS_OUTPUT;
+import static com.alibaba.cloud.ai.constant.Constant.CSV_COLUMN_DOCUMENTS_OUTPUT;
 
 /**
  * Schema recall node that retrieves relevant database schema information based on
@@ -70,27 +72,42 @@ public class SchemaRecallNode implements NodeAction {
 		// Execute business logic first - recall schema information immediately
 		List<Document> tableDocuments;
 		List<List<Document>> columnDocumentsByKeywords;
+		
+		// CSV schema recall
+		List<Document> csvFileDocuments;
+		List<List<Document>> csvColumnDocumentsByKeywords;
 
 		// If agentId exists, use agent-specific search, otherwise use global search
 		if (agentId != null && !agentId.trim().isEmpty()) {
 			logger.info("Using agent-specific schema recall for agent: {}", agentId);
+			// Database schema recall
 			tableDocuments = baseSchemaService.getTableDocumentsForAgent(agentId, input);
 			columnDocumentsByKeywords = baseSchemaService.getColumnDocumentsByKeywordsForAgent(agentId, keywords);
+			// CSV schema recall
+			csvFileDocuments = baseSchemaService.getCsvFileDocumentsForAgent(agentId, input);
+			csvColumnDocumentsByKeywords = baseSchemaService.getCsvColumnDocumentsByKeywordsForAgent(agentId, keywords);
 		}
 		else {
 			logger.info("Using global schema recall (no agentId provided)");
+			// Database schema recall
 			tableDocuments = baseSchemaService.getTableDocuments(input);
 			columnDocumentsByKeywords = baseSchemaService.getColumnDocumentsByKeywords(keywords);
+			// CSV schema recall
+			csvFileDocuments = baseSchemaService.getCsvFileDocuments(input, null);
+			csvColumnDocumentsByKeywords = baseSchemaService.getCsvColumnDocumentsByKeywords(keywords, null);
 		}
 
 		logger.info(
-				"[{}] Schema recall results - table documents count: {}, keyword-related column document groups: {}",
-				this.getClass().getSimpleName(), tableDocuments.size(), columnDocumentsByKeywords.size());
+				"[{}] Schema recall results - table documents count: {}, keyword-related column document groups: {}, csv file documents count: {}, csv column document groups: {}",
+				this.getClass().getSimpleName(), tableDocuments.size(), columnDocumentsByKeywords.size(), 
+				csvFileDocuments.size(), csvColumnDocumentsByKeywords.size());
 
 		Flux<ChatResponse> displayFlux = Flux.create(emitter -> {
 			emitter.next(ChatResponseUtil.createStatusResponse("开始召回Schema信息..."));
-			emitter.next(ChatResponseUtil.createStatusResponse("表信息召回完成，数量: " + tableDocuments.size()));
-			emitter.next(ChatResponseUtil.createStatusResponse("列信息召回完成，数量: " + columnDocumentsByKeywords.size()));
+			emitter.next(ChatResponseUtil.createStatusResponse("数据库表信息召回完成，数量: " + tableDocuments.size()));
+			emitter.next(ChatResponseUtil.createStatusResponse("数据库列信息召回完成，数量: " + columnDocumentsByKeywords.size()));
+			emitter.next(ChatResponseUtil.createStatusResponse("CSV文件信息召回完成，数量: " + csvFileDocuments.size()));
+			emitter.next(ChatResponseUtil.createStatusResponse("CSV列信息召回完成，数量: " + csvColumnDocumentsByKeywords.size()));
 			emitter.next(ChatResponseUtil.createStatusResponse("Schema信息召回完成."));
 			emitter.complete();
 		});
@@ -99,8 +116,14 @@ public class SchemaRecallNode implements NodeAction {
 				currentState -> {
 					logger.info("Table document details: {}", tableDocuments);
 					logger.info("Keyword-related column document details: {}", columnDocumentsByKeywords);
-					return Map.of(TABLE_DOCUMENTS_FOR_SCHEMA_OUTPUT, tableDocuments,
-							COLUMN_DOCUMENTS_BY_KEYWORDS_OUTPUT, columnDocumentsByKeywords);
+					logger.info("CSV file document details: {}", csvFileDocuments);
+					logger.info("CSV column document details: {}", csvColumnDocumentsByKeywords);
+					return Map.of(
+						TABLE_DOCUMENTS_FOR_SCHEMA_OUTPUT, tableDocuments,
+						COLUMN_DOCUMENTS_BY_KEYWORDS_OUTPUT, columnDocumentsByKeywords,
+						CSV_FILE_DOCUMENTS_OUTPUT, csvFileDocuments,
+						CSV_COLUMN_DOCUMENTS_OUTPUT, csvColumnDocumentsByKeywords
+					);
 				}, displayFlux, StreamResponseType.SCHEMA_RECALL);
 
 		// Return the processing result

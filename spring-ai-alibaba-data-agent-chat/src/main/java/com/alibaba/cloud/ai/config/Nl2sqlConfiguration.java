@@ -156,6 +156,17 @@ public class Nl2sqlConfiguration {
 			keyStrategyHashMap.put(HUMAN_REVIEW_ENABLED, new ReplaceStrategy());
 			// Final result
 			keyStrategyHashMap.put(RESULT, new ReplaceStrategy());
+			// CSV相关
+			keyStrategyHashMap.put(SESSION_ID, new ReplaceStrategy());
+			keyStrategyHashMap.put(DATA_SOURCE_TYPE, new ReplaceStrategy());
+			keyStrategyHashMap.put(CSV_FILES, new ReplaceStrategy());
+			keyStrategyHashMap.put(HAS_DATABASE, new ReplaceStrategy());
+			keyStrategyHashMap.put(CSV_FILE_COUNT, new ReplaceStrategy());
+			keyStrategyHashMap.put(CSV_SCHEMAS, new ReplaceStrategy());
+			keyStrategyHashMap.put(CSV_SCHEMA_COUNT, new ReplaceStrategy());
+			keyStrategyHashMap.put(CSV_ANALYSIS_CODE, new ReplaceStrategy());
+			keyStrategyHashMap.put(ANALYSIS_TYPE, new ReplaceStrategy());
+			keyStrategyHashMap.put(ERROR_MESSAGE, new ReplaceStrategy());
 			return keyStrategyHashMap;
 		};
 
@@ -176,7 +187,8 @@ public class Nl2sqlConfiguration {
 			.addNode(PYTHON_ANALYZE_NODE, node_async(new PythonAnalyzeNode(chatClientBuilder)))
 			.addNode(REPORT_GENERATOR_NODE, node_async(new ReportGeneratorNode(chatClientBuilder, promptConfigService)))
 			.addNode(SEMANTIC_CONSISTENCY_NODE, node_async(new SemanticConsistencyNode(nl2SqlService)))
-			.addNode("human_feedback", node_async(new HumanFeedbackNode()));
+			.addNode("human_feedback", node_async(new HumanFeedbackNode()))
+			.addNode(CSV_ANALYZE_NODE, node_async(new CsvAnalyzeNode()));
 
 		stateGraph.addEdge(START, QUERY_REWRITE_NODE)
 			.addConditionalEdges(QUERY_REWRITE_NODE, edge_async(new QueryRewriteDispatcher()),
@@ -203,6 +215,8 @@ public class Nl2sqlConfiguration {
 					// If validation passes, proceed to the correct execution node
 					SQL_EXECUTE_NODE, SQL_EXECUTE_NODE, PYTHON_GENERATE_NODE, PYTHON_GENERATE_NODE,
 					REPORT_GENERATOR_NODE, REPORT_GENERATOR_NODE,
+					// CSV nodes
+					CSV_SCHEMA_NODE, CSV_SCHEMA_NODE, CSV_ANALYZE_NODE, CSV_ANALYZE_NODE,
 					// If human review is enabled, go to human_feedback node
 					"human_feedback", "human_feedback",
 					// If max repair attempts are reached, end the process
@@ -221,7 +235,10 @@ public class Nl2sqlConfiguration {
 			.addConditionalEdges(SQL_GENERATE_NODE, edge_async(new SqlGenerateDispatcher()),
 					Map.of(KEYWORD_EXTRACT_NODE, KEYWORD_EXTRACT_NODE, END, END, SQL_EXECUTE_NODE, SQL_EXECUTE_NODE))
 			.addConditionalEdges(SEMANTIC_CONSISTENCY_NODE, edge_async(new SemanticConsistenceDispatcher()),
-					Map.of(SQL_GENERATE_NODE, SQL_GENERATE_NODE, PLAN_EXECUTOR_NODE, PLAN_EXECUTOR_NODE));
+					Map.of(SQL_GENERATE_NODE, SQL_GENERATE_NODE, PLAN_EXECUTOR_NODE, PLAN_EXECUTOR_NODE))
+			// CSV node connections
+			.addEdge(CSV_SCHEMA_NODE, CSV_ANALYZE_NODE)
+			.addEdge(CSV_ANALYZE_NODE, PYTHON_EXECUTE_NODE);
 
 		GraphRepresentation graphRepresentation = stateGraph.getGraph(GraphRepresentation.Type.PLANTUML,
 				"workflow graph");

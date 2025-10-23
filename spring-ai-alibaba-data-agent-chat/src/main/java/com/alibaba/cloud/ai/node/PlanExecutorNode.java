@@ -38,6 +38,8 @@ import static com.alibaba.cloud.ai.constant.Constant.PLAN_CURRENT_STEP;
 import static com.alibaba.cloud.ai.constant.Constant.PLAN_NEXT_NODE;
 import static com.alibaba.cloud.ai.constant.Constant.PLAN_REPAIR_COUNT;
 import static com.alibaba.cloud.ai.constant.Constant.PLAN_VALIDATION_ERROR;
+import static com.alibaba.cloud.ai.constant.Constant.CSV_SCHEMA_NODE;
+import static com.alibaba.cloud.ai.constant.Constant.CSV_ANALYZE_NODE;
 import static com.alibaba.cloud.ai.constant.Constant.PLAN_VALIDATION_STATUS;
 import static com.alibaba.cloud.ai.constant.Constant.PYTHON_GENERATE_NODE;
 import static com.alibaba.cloud.ai.constant.Constant.REPORT_GENERATOR_NODE;
@@ -55,7 +57,7 @@ public class PlanExecutorNode extends AbstractPlanBasedNode {
 
 	// Supported node types
 	private static final Set<String> SUPPORTED_NODES = Set.of(SQL_EXECUTE_NODE, PYTHON_GENERATE_NODE,
-			REPORT_GENERATOR_NODE);
+			REPORT_GENERATOR_NODE, CSV_SCHEMA_NODE, CSV_ANALYZE_NODE);
 
 	private final BeanOutputConverter<Plan> converter;
 

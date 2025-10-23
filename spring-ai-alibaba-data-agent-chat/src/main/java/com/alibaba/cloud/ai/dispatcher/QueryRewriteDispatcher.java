@@ -42,8 +42,8 @@ public class QueryRewriteDispatcher implements EdgeAction {
 				logger.info("[QueryRewriteDispatcher]意图不明确或闲聊被拒绝，返回END节点");
 				return END;
 			default:
-				logger.info("[QueryRewriteDispatcher]进入KEYWORD_EXTRACT_NODE节点");
-				return KEYWORD_EXTRACT_NODE;
+				logger.info("[QueryRewriteDispatcher]进入数据源检测节点");
+				return "DATA_SOURCE_DETECT_NODE";
 		}
 	}
 

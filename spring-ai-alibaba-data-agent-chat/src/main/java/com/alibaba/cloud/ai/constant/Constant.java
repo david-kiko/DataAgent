@@ -147,4 +147,37 @@ public final class Constant {
 	// 人类复核相关
 	public static final String HUMAN_REVIEW_ENABLED = "HUMAN_REVIEW_ENABLED";
 
+	// CSV相关常量
+	public static final String SESSION_ID = "SESSION_ID";
+	
+	public static final String DATA_SOURCE_TYPE = "DATA_SOURCE_TYPE";
+	
+	public static final String CSV_FILES = "CSV_FILES";
+	
+	public static final String HAS_DATABASE = "HAS_DATABASE";
+	
+	public static final String CSV_FILE_COUNT = "CSV_FILE_COUNT";
+	
+	public static final String CSV_SCHEMAS = "CSV_SCHEMAS";
+	
+	public static final String CSV_SCHEMA_COUNT = "CSV_SCHEMA_COUNT";
+	
+	public static final String CSV_ANALYSIS_CODE = "CSV_ANALYSIS_CODE";
+	
+	public static final String ANALYSIS_TYPE = "ANALYSIS_TYPE";
+	
+	public static final String ERROR_MESSAGE = "ERROR_MESSAGE";
+
+	// CSV节点常量
+	public static final String CSV_SCHEMA_NODE = "CSV_SCHEMA_NODE";
+	
+	public static final String CSV_ANALYZE_NODE = "CSV_ANALYZE_NODE";
+	
+	public static final String DATA_SOURCE_DETECT_NODE = "DATA_SOURCE_DETECT_NODE";
+	
+	// CSV召回相关常量
+	public static final String CSV_FILE_DOCUMENTS_OUTPUT = "CSV_FILE_DOCUMENTS_OUTPUT";
+	
+	public static final String CSV_COLUMN_DOCUMENTS_OUTPUT = "CSV_COLUMN_DOCUMENTS_OUTPUT";
+
 }
