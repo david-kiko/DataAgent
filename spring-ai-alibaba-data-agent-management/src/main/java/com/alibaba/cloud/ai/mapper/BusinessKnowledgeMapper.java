@@ -61,8 +61,8 @@ public interface BusinessKnowledgeMapper extends BaseMapper<BusinessKnowledge> {
 	/**
 	 * Query business knowledge by dataset ID and default recall status
 	 */
-	@Select("SELECT * FROM business_knowledge WHERE data_set_id = #{datasetId} AND is_recall = #{defaultRecall} ORDER BY created_time DESC")
+	@Select("SELECT * FROM business_knowledge WHERE data_set_id = #{datasetId} AND is_recall = #{isRecall} ORDER BY created_time DESC")
 	List<BusinessKnowledge> selectByDatasetIdAndDefaultRecall(@Param("datasetId") String datasetId,
-			@Param("defaultRecall") Boolean defaultRecall);
+			@Param("isRecall") Integer isRecall);
 
 }

@@ -37,7 +37,7 @@ public class BusinessKnowledge {
 	private String synonyms; // Synonyms, comma-separated
 
 	@TableField("is_recall")
-	private Boolean defaultRecall; // Default recall
+	private Integer isRecall; // Default recall (0=否, 1=是)
 
 	@TableField("data_set_id")
 	private String datasetId; // Associated dataset ID
@@ -54,33 +54,33 @@ public class BusinessKnowledge {
 	public BusinessKnowledge() {
 	}
 
-	public BusinessKnowledge(String businessTerm, String description, String synonyms, Boolean defaultRecall,
+	public BusinessKnowledge(String businessTerm, String description, String synonyms, Integer isRecall,
 			String datasetId) {
 		this.businessTerm = businessTerm;
 		this.description = description;
 		this.synonyms = synonyms;
-		this.defaultRecall = defaultRecall;
+		this.isRecall = isRecall;
 		this.datasetId = datasetId;
 		this.agentId = null; // Defaults to null for backward compatibility
 	}
 
-	public BusinessKnowledge(String businessTerm, String description, String synonyms, Boolean defaultRecall,
+	public BusinessKnowledge(String businessTerm, String description, String synonyms, Integer isRecall,
 			String datasetId, String agentId) {
 		this.businessTerm = businessTerm;
 		this.description = description;
 		this.synonyms = synonyms;
-		this.defaultRecall = defaultRecall;
+		this.isRecall = isRecall;
 		this.datasetId = datasetId;
 		this.agentId = agentId;
 	}
 
-	public BusinessKnowledge(Long id, String businessTerm, String description, String synonyms, Boolean defaultRecall,
+	public BusinessKnowledge(Long id, String businessTerm, String description, String synonyms, Integer isRecall,
 			String datasetId, String agentId, LocalDateTime createTime, LocalDateTime updateTime) {
 		this.id = id;
 		this.businessTerm = businessTerm;
 		this.description = description;
 		this.synonyms = synonyms;
-		this.defaultRecall = defaultRecall;
+		this.isRecall = isRecall;
 		this.datasetId = datasetId;
 		this.agentId = agentId;
 		this.createTime = createTime;
@@ -120,12 +120,21 @@ public class BusinessKnowledge {
 		this.synonyms = synonyms;
 	}
 
+	public Integer getIsRecall() {
+		return isRecall;
+	}
+
+	public void setIsRecall(Integer isRecall) {
+		this.isRecall = isRecall;
+	}
+
+	// 为了兼容前端，提供Boolean类型的getter/setter
 	public Boolean getDefaultRecall() {
-		return defaultRecall;
+		return isRecall != null && isRecall == 1;
 	}
 
 	public void setDefaultRecall(Boolean defaultRecall) {
-		this.defaultRecall = defaultRecall;
+		this.isRecall = defaultRecall != null && defaultRecall ? 1 : 0;
 	}
 
 	public String getDatasetId() {

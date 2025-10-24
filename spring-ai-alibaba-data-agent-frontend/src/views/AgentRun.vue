@@ -158,6 +158,7 @@
               v-for="message in currentMessages" 
               :key="message.id"
               class="message-item"
+              :data-message-id="message.id"
               :class="{ 'user-message': message.role === 'user', 'assistant-message': message.role === 'assistant' }"
             >
               <!-- 用户消息保持原有布局 -->
@@ -416,6 +417,7 @@ export default {
           const data = await response.json()
           // 将数据库消息转换为前端格式
           currentMessages.value = data.map(dbMessage => {
+            console.log('🔄 加载消息，数据库ID:', dbMessage.id, '角色:', dbMessage.role)
             const message = {
               id: dbMessage.id,
               role: dbMessage.role,
@@ -1438,8 +1440,8 @@ export default {
         }
     };
 
-    const formatContentByType = (type, data) => {
-        console.log('📞📞📞 formatContentByType被调用！类型:', type, '数据长度:', data?.toString().length)
+    const formatContentByType = (type, data, messageId = null) => {
+        console.log('📞📞📞 formatContentByType被调用！类型:', type, '数据长度:', data?.toString().length, '消息ID:', messageId)
 
         if (data === null || data === undefined) return '';
 
@@ -1484,7 +1486,7 @@ export default {
                             </span>
                         </div>
                         <div class="report-preview-section" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e9ecef; text-align: center;">
-                            <button class="preview-report-btn" onclick="window.openReportPreviewByType && window.openReportPreviewByType('output_report')" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; padding: 12px 24px; font-size: 14px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); transition: all 0.3s ease;">
+                            <button class="preview-report-btn" onclick="window.openReportPreviewByType && window.openReportPreviewByType('output_report', window.getCurrentMessageId && window.getCurrentMessageId())" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; padding: 12px 24px; font-size: 14px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); transition: all 0.3s ease;">
                                 <i class="bi bi-eye"></i>
                                 预览完整报告
                             </button>
@@ -1850,18 +1852,9 @@ export default {
 
     // 新增：获取消息的显示内容（统一处理所有显示逻辑）
     const getDisplayContent = (message) => {
-      console.log('🚨🚨🚨 getDisplayContent 开始处理 🚨🚨🚨')
-      console.log('消息ID:', message.id)
-      console.log('消息类型:', message.type)
-      console.log('消息角色:', message.role)
-      console.log('内容长度:', message.content?.length)
-      console.log('内容预览:', message.content?.substring(0, 500))
 
       // 🎯 智能处理：检查并处理包含output_report的内容
       if (message.role === 'assistant' && message.type !== 'streaming') {
-        console.log('🎯 getDisplayContent: 检查消息内容类型')
-        console.log('消息长度:', message.content.length)
-        console.log('消息类型:', message.type)
 
         // 🔍 关键调试：检查隐藏标记的具体情况
         const hasHiddenCompleteDiv = message.content.includes('<div class="report-generation-complete"')
@@ -1874,81 +1867,56 @@ export default {
           console.log('💾 提前保存原始内容，长度:', message.originalContent.length)
         }
 
-        console.log('🔍 隐藏标记检查:')
-        console.log('- 包含隐藏完成div:', hasHiddenCompleteDiv)
-        console.log('- 包含隐藏进度div:', hasHiddenProgressDiv)
-        console.log('- 包含隐藏相关文本:', hasHiddenText)
-        console.log('- 包含输出报告:', message.content.includes('输出报告'))
-        console.log('- 包含HTML代码块:', message.content.includes('```html'))
-        console.log('- 已保存原始内容:', !!message.originalContent)
 
         // 🎯 核心解决方案：分离显示内容和预览内容
         if (hasHiddenCompleteDiv || hasHiddenProgressDiv) {
-          console.log('✅ 包含隐藏标记，检查是否需要分离显示和预览内容')
-
           // 检查是否同时包含HTML代码块（说明原始报告内容还在）
           const hasHtmlBlocks = message.content.includes('```html')
-          console.log('🔍 同时包含HTML代码块:', hasHtmlBlocks)
 
           if (hasHtmlBlocks) {
-            console.log('🎯 实施分离策略：保留原始数据，生成清理后的显示内容')
 
             // 1. 将原始完整内容存储到消息对象中（用于预览）
             if (!message.originalContent) {
               message.originalContent = message.content
-              console.log('💾 保存原始内容用于预览，长度:', message.originalContent.length)
             }
 
             // 2. 生成清理后的显示内容
             let displayContent = message.content
 
-            console.log('🧹 开始清理，原始长度:', displayContent.length)
 
             // 移除HTML代码块
             const beforeHtmlClean = displayContent.length
             displayContent = displayContent.replace(/```html[\s\S]*?```/gi, '')
-            console.log('🧹 移除HTML代码块后，长度从', beforeHtmlClean, '变为', displayContent.length)
 
             // 移除包含"Created by Autobots"的大段HTML内容
             const beforeAutobotClean = displayContent.length
             displayContent = displayContent.replace(/<div[^>]*>[\s\S]*?Created by Autobots[\s\S]*?<\/div>/gi, '')
-            console.log('🧹 移除Autobots内容后，长度从', beforeAutobotClean, '变为', displayContent.length)
 
             // 3. 检查预览按钮修复（谨慎处理，避免重复添加）
             const buttonCount = (displayContent.match(/onclick="window\.openReportPreviewFromContent/g) || []).length
-            console.log('🔍 当前预览按钮数量:', buttonCount)
 
             if (buttonCount > 0) {
-              console.log('🔧 修复预览按钮，使用新的预览方法')
               // 替换所有有问题的onclick为新的简单调用
               displayContent = displayContent.replace(
                 /onclick="window\.openReportPreviewFromContent[^"]*"/g,
-                `onclick="window.openReportPreviewByType && window.openReportPreviewByType('output_report')"`
+                `onclick="window.openReportPreviewByType && window.openReportPreviewByType('output_report', '${message.id}')"`
               )
             } else {
-              console.log('⚠️ 没有找到预览按钮，可能清理过度了')
             }
-
-            console.log('🎯 分离完成:')
-            console.log('- 原始内容长度:', message.originalContent.length, '(用于预览)')
-            console.log('- 显示内容长度:', displayContent.length, '(用于聊天框)')
 
             return displayContent
           } else {
-            console.log('✅ 只有隐藏标记，没有原始内容，直接返回')
             return message.content
           }
         }
 
         // 如果只是包含文本但没有div，说明是误判，继续处理
         if (hasHiddenText && !hasHiddenCompleteDiv && !hasHiddenProgressDiv) {
-          console.log('⚠️ 只包含隐藏相关文本，但没有真正的隐藏div，继续处理')
         }
 
         // 检查是否包含agent-responses-container结构且包含输出报告
         if (message.content.includes('agent-responses-container') &&
             message.content.includes('输出报告')) {
-          console.log('🎯 检测到包含输出报告的流式结构，需要处理隐藏')
 
           // 查找并替换输出报告块中的HTML内容
           let processedContent = message.content
@@ -1959,7 +1927,6 @@ export default {
           let match
           while ((match = reportBlockRegex.exec(message.content)) !== null) {
             const reportContent = match[1]
-            console.log('🎯 找到输出报告块，内容长度:', reportContent.length)
 
             // 检查是否包含HTML内容
             const hasHtmlContent = /```\s*html?\s*([\s\S]*?)```/gi.test(reportContent) ||
@@ -1967,7 +1934,6 @@ export default {
                                   reportContent.includes('Created by Autobots')
 
             if (hasHtmlContent) {
-              console.log('🎯 输出报告包含HTML内容，替换为隐藏状态')
 
               const hiddenReportBlock = `<div class="agent-response-block" style="display: block !important; width: 100% !important;">
   <div class="agent-response-title">
@@ -2097,7 +2063,7 @@ export default {
                       </span>
                     </div>
                     <div class="report-preview-section" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e9ecef; text-align: center;">
-                      <button class="preview-report-btn" onclick="window.openReportPreviewByType && window.openReportPreviewByType('output_report')" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; padding: 12px 24px; font-size: 14px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); transition: all 0.3s ease;">
+                      <button class="preview-report-btn" onclick="console.log('🎯 按钮点击，消息ID:', '${message.id}'); window.openReportPreviewByType && window.openReportPreviewByType('output_report', '${message.id}')" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; padding: 12px 24px; font-size: 14px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); transition: all 0.3s ease;">
                         <i class="bi bi-eye"></i>
                         预览完整报告
                       </button>
@@ -2265,12 +2231,6 @@ export default {
       if (!isReportMessage(message)) {
         return formatMessage(message.content)
       }
-
-      console.log('处理报告消息:', message.id, '内容长度:', message.content?.length)
-      console.log('消息内容预览:', message.content?.substring(0, 500) + '...')
-      console.log('消息类型:', message.type)
-      console.log('是否包含输出报告关键词:', message.content?.includes('输出报告'))
-      console.log('是否包含output_report关键词:', message.content?.includes('output_report'))
 
       // 对于报告消息，检查是否包含我们的特殊处理内容
       if (message.content.includes('report-generation-complete') ||
@@ -2577,31 +2537,60 @@ export default {
       })
     }
 
+    // 🎯 事件委托：处理按钮点击事件
+    document.addEventListener('click', (event) => {
+      if (event.target.closest('.preview-report-btn')) {
+        const button = event.target.closest('.preview-report-btn')
+        const messageElement = button.closest('[data-message-id]')
+        
+        if (messageElement) {
+          const messageId = messageElement.getAttribute('data-message-id')
+          console.log('🎯 事件委托获取消息ID:', messageId)
+          
+          // 调用预览函数
+          if (window.openReportPreviewByType) {
+            window.openReportPreviewByType('output_report', messageId)
+          }
+          
+          // 阻止默认行为
+          event.preventDefault()
+          event.stopPropagation()
+        }
+      }
+    })
+
     // 🎯 新的预览函数：根据类型打开报告预览
-    const openReportPreviewByType = (type) => {
-      console.log('🎯 根据类型打开报告预览:', type)
+    window.openReportPreviewByType = (type, messageId = null) => {
+      console.log('🎯 打开报告预览:', type, '消息ID:', messageId)
 
-      // 找到最新的包含指定类型的消息
-      const latestMessage = currentMessages.value
-        .filter(msg => msg.role === 'assistant' && msg.content && msg.content.includes('输出报告'))
-        .pop()
+      let targetMessage = null
 
-      if (latestMessage) {
-        console.log('🎯 找到包含报告的消息，ID:', latestMessage.id)
-        console.log('🎯 消息有原始内容:', !!latestMessage.originalContent)
-        console.log('🎯 当前内容包含HTML:', latestMessage.content.includes('```html'))
+      if (messageId) {
+        // 如果提供了消息ID，直接查找对应的消息
+        targetMessage = currentMessages.value.find(msg => msg.id == messageId || msg.id == parseInt(messageId))
+        console.log('🎯 根据消息ID查找:', messageId, '找到:', !!targetMessage)
+        if (targetMessage) {
+          console.log('🎯 找到的消息ID:', targetMessage.id, '类型:', typeof targetMessage.id)
+        }
+      } else {
+        // 如果没有提供消息ID，找到最新的包含指定类型的消息
+        targetMessage = currentMessages.value
+          .filter(msg => msg.role === 'assistant' && msg.content && msg.content.includes('输出报告'))
+          .pop()
+        console.log('🎯 查找最新消息，找到:', !!targetMessage)
+      }
+
+      if (targetMessage) {
+        console.log('🎯 找到报告消息，ID:', targetMessage.id)
 
         // 优先使用原始内容，如果没有则使用当前内容
-        let contentToPreview = latestMessage.originalContent || latestMessage.content
+        let contentToPreview = targetMessage.originalContent || targetMessage.content
 
         // 如果当前内容和原始内容都没有HTML，尝试从全局保存的内容中获取
         if (!contentToPreview.includes('```html')) {
-          console.log('⚠️ 当前消息没有HTML内容，尝试其他方式获取')
-
           // 尝试从全局保存的内容中获取
           if (window.lastReportContent && window.lastReportContent.includes('```html')) {
             contentToPreview = window.lastReportContent
-            console.log('🎯 从全局保存的内容获取HTML，长度:', contentToPreview.length)
           } else {
             // 尝试从所有消息中查找
             const allMessagesWithHtml = currentMessages.value.filter(msg =>
@@ -2618,8 +2607,6 @@ export default {
           }
         }
 
-        console.log('🎯 最终预览内容长度:', contentToPreview.length)
-        console.log('🎯 预览内容包含HTML:', contentToPreview.includes('```html'))
 
         // 创建预览消息对象
         const previewMessage = {

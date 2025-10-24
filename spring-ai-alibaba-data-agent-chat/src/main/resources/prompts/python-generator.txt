@@ -8,6 +8,7 @@
 2. **输入规范**：从`sys.stdin`读取JSON数据（List[Dict]），使用`json.load(sys.stdin)`。
 3. **输出规范**：最终结果必须是JSON对象（Dict），通过`print(json.dumps(result, ensure_ascii=False, default=str))`输出，JSON字段可以自定义，但要满足用户需求。
    - **重要**：所有 pandas 的 Timestamp、datetime 等时间类型对象必须转换为字符串，避免 JSON 序列化错误。
+   - **时间处理规范**：处理时间字段时必须使用安全的时间转换方法，避免 `.dt` 访问器错误。
 4. **错误处理**：使用以下结构捕获所有异常：
    ```python
    import traceback
@@ -19,12 +20,17 @@
    ```
 5. **依赖限制**：所有使用的库必须是Python标准库或预安装的第三方库，如`pandas`, `numpy`, `json`, `sys`等。
 6. **动态处理**：禁止硬编码列名/值，所有逻辑基于输入数据动态构建。
-7. **安全限制**：禁止以下操作：
+7. **时间字段处理**：处理时间相关字段时必须遵循以下安全规范：
+   - 使用 `pd.to_datetime(series, errors='coerce')` 进行时间转换
+   - 在使用 `.dt` 访问器前，必须检查数据类型：`pd.api.types.is_datetime64_any_dtype(series)`
+   - 时间计算前先验证时间字段是否为有效的datetime类型
+   - 提供时间转换失败的降级处理方案
+8. **安全限制**：禁止以下操作：
    - 任何文件/网络操作（open/requests等）。
    - 系统调用（os/subprocess）。
    - 图形/绘图功能。
    - 一些危险的库（pickle）。
-8. **性能约束**：单线程执行，最大内存：{python_memory} MB，超时时间：{python_timeout}。
+9. **性能约束**：单线程执行，最大内存：{python_memory} MB，超时时间：{python_timeout}。
 
 **核心要求**：生成的代码必须满足：
 ① 输入SQL结果JSON → ② 执行分析 → ③ 输出JSON结果 的完整闭环。
@@ -66,7 +72,26 @@ try:
     grouped = df.groupby(list(df.columns[:2])).size().reset_index(name="count")
     result["details"] = grouped.to_dict(orient="records")
 
-    # 时间类型处理示例：如果涉及时间字段，确保转换为字符串
+    # 时间类型处理示例：安全的时间字段处理
+    # def safe_datetime_convert(series):
+    #     """安全的时间转换函数"""
+    #     try:
+    #         converted = pd.to_datetime(series, errors='coerce')
+    #         return converted
+    #     except:
+    #         return pd.Series([pd.NaT] * len(series), index=series.index)
+    # 
+    # # 处理时间字段
+    # for col in df.columns:
+    #     if df[col].dtype == 'object':  # 可能是时间字符串
+    #         df[col] = safe_datetime_convert(df[col])
+    # 
+    # # 时间计算前检查类型
+    # if pd.api.types.is_datetime64_any_dtype(df['time_column']):
+    #     # 安全的时间计算
+    #     result['time_diff'] = (current_time - df['time_column']).dt.days
+    # 
+    # # 最终输出前转换时间字段为字符串
     # for col in df.columns:
     #     if pd.api.types.is_datetime64_any_dtype(df[col]):
     #         df[col] = df[col].astype(str)
@@ -88,6 +113,7 @@ except Exception:
 1. **输入验证**：确保代码能够正确处理空输入或格式不正确的输入，并在异常时提供清晰的错误信息。**处理的数据必须来自`json.load(sys.stdin)`**。
 2. **性能优化**：尽量减少不必要的计算和内存占用，确保代码在性能约束内高效运行。
 3. **结果完整性**：输出的JSON对象应全面反映分析结果，且字段命名清晰易懂。
+4. **时间处理安全**：涉及时间字段处理时，必须使用安全的时间转换和验证方法，避免 `.dt` 访问器错误。
 
 ---
 
@@ -100,6 +126,7 @@ import sys
 import json
 import traceback
 import pandas as pd
+from datetime import datetime
 
 try:
     # 从stdin读取输入数据
@@ -107,6 +134,15 @@ try:
 
     # 转换为DataFrame
     df = pd.DataFrame(input_data)
+
+    # 安全的时间转换函数
+    def safe_datetime_convert(series):
+        """安全的时间转换函数"""
+        try:
+            converted = pd.to_datetime(series, errors='coerce')
+            return converted
+        except:
+            return pd.Series([pd.NaT] * len(series), index=series.index)
 
     # 动态分析逻辑
     result = \{
@@ -121,6 +157,19 @@ try:
         ).reset_index()
 
         result["channel_stats"] = grouped.to_dict(orient="records")
+
+    # 时间字段处理示例（如果涉及时间计算）
+    # if "time_column" in df.columns:
+    #     # 安全转换时间字段
+    #     df["time_column"] = safe_datetime_convert(df["time_column"])
+    #     
+    #     # 时间计算前检查类型
+    #     if pd.api.types.is_datetime64_any_dtype(df["time_column"]):
+    #         current_time = datetime.now()
+    #         df["time_diff"] = (current_time - df["time_column"]).dt.days
+    #     
+    #     # 输出前转换时间字段为字符串
+    #     df["time_column"] = df["time_column"].astype(str)
 
     # 输出结果为JSON对象
     print(json.dumps(result, ensure_ascii=False, default=str))

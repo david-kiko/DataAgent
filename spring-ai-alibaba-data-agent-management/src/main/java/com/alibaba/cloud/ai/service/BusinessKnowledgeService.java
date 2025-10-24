@@ -40,10 +40,10 @@ public class BusinessKnowledgeService {
 	}
 
 	private void initSampleData() {
-		save(new BusinessKnowledge("年龄分布", "分别计算劳动人口占比，少年儿童占比，老年人口占比三个字段指标的平均值", "年龄画像,年龄构成,年龄结构", true,
+		save(new BusinessKnowledge("年龄分布", "分别计算劳动人口占比，少年儿童占比，老年人口占比三个字段指标的平均值", "年龄画像,年龄构成,年龄结构", 1,
 				"dataset_001"));
-		save(new BusinessKnowledge("搜索业绩口径", "定义：订单/流量计入搜索", "搜索业绩,搜索口径", false, "dataset_001"));
-		save(new BusinessKnowledge("GMV", "商品交易总额，包含付款和未付款的订单金额", "交易总额,成交总额", true, "dataset_002"));
+		save(new BusinessKnowledge("搜索业绩口径", "定义：订单/流量计入搜索", "搜索业绩,搜索口径", 0, "dataset_001"));
+		save(new BusinessKnowledge("GMV", "商品交易总额，包含付款和未付款的订单金额", "交易总额,成交总额", 1, "dataset_002"));
 	}
 
 	public List<BusinessKnowledge> findAll() {
